@@ -1,19 +1,16 @@
-# Pilot-Streaming
+# Pilot-Quantum
 
-Last Updated: 03/24/2019
+Last Updated: 02/28/2024
 
 # Overview:
 
- Pilot-Streaming is a tool to manage Streaming environments, e.g., Kafka, Spark Streaming, Flink and Dask on HPC systems. Further, it is able to deploy auxiliary components 
- for HPC/Cloud-based streaming to edge resources (via SSH access).
+Pilot-Quantum is presented as a Quantum-HPC middleware framework designed to address the challenges of integrating quantum and classical computing resources. It focuses on managing heterogeneous resources, including diverse Quantum Processing Unit (QPU) modalities and various integration types with classical resources, such as accelerators.
  
 Requirements:
 
-	* PBS/Torque cluster
-	* Working directory should be on a shared filesystem
+	* SLURM/PBS/Torque cluster
 	* Setup password-less documentation
-	* JAVA needs to be installed and in PATH
-
+	
 
 Anaconda is the preferred distribution
 
@@ -21,16 +18,16 @@ Anaconda is the preferred distribution
 ## Installation
 Requirement (in case a manual installation is required):
 
-The best way to utilize Pilot-Streaming is Anaconda, which provides an easy way to install
+The best way to utilize Pilot-Quantum is Anaconda, which provides an easy way to install
 important dependencies (such as PySpark and Dask). Make sure the PySpark version is compabitible 
-with the Pilot-Streaming version (currently 2.4.4).
+with the Pilot-Quantum version (currently 2.4.4).
 
 
     conda install paramiko  
     conda install -c conda-forge boto3 python-openstackclient pykafka pyspark dask distributed python-confluent-kafka pexpect redis-py  
     pip install hostlist
 
-To install Pilot-Streaming type:
+To install Pilot-Quantum type:
 
     pip install --upgrade .
     
@@ -65,6 +62,8 @@ see `kafka` for setting up a Kafka 1.0.x cluster
 see `flink` for setting up a Flink 1.1.4 cluster
 
 see `dask` for setting up a Dask Distributed 1.20.2 cluster
+
+see `ray` for setting up a Ray cluster
 
 
 # Examples:
