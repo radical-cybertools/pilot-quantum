@@ -39,7 +39,7 @@ def update_version():
     f = open(fn, "w")
     f.write(ver)
     f.close()
-    print("Pilot-Streaming VERSION: '%s'" % ver)
+    print("Pilot-Quantum VERSION: '%s'" % ver)
 
 
 def get_version():
@@ -58,12 +58,12 @@ def create_manifest():
     
 #update_version()
     
-setup(name='Pilot-Streaming',
+setup(name='Pilot-Quantum',
       version=get_version(),
-      description='Framework for Management of Streaming Frameworks on HPC clusters (Torque/PBS/SLURM)',
+      description='Framework for Management of Quantum-HPC applications on HPC clusters (Torque/PBS/SLURM)',
       author='Andre Luckow',
       author_email='aluckow@clemson.edu',
-      url='https://github.com/radical-cybertools/pilot-streaming',
+      url='https://github.com/radical-cybertools/pilot-quantum',
       classifiers = ['Development Status :: 5 - Production/Stable',                  
                     'Programming Language :: Python',
                     'Environment :: Console',                    
@@ -84,7 +84,7 @@ setup(name='Pilot-Streaming',
       package_data= {'': ['*.xml', '*.yaml', '*.properties']},
       install_requires=['uuid', 'pykafka', 'argparse', 'python-hostlist', 'dask', 'distributed', 'pyspark', 'paramiko', 'boto3'],
       entry_points = {
-        'console_scripts': ['psm=commandline.main:main',
-                            'pilot-streaming=commandline.main:main']
+        'console_scripts': ['pq=commandline.main:main',
+                            'pilot-quantum=commandline.main:main']
       }
 )
