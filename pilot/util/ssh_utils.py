@@ -138,16 +138,16 @@ def execute_ssh_command_as_daemon(host, user=None, command="/bin/date", argument
 
 
 
-def install_pilot_streaming(hostname, pilot_compute_description):
+def install_pilot_quantum(hostname, pilot_compute_description):
     """
-    Installs and bootstraps latest pilot-streaming and mini apps from github
+    Installs and bootstraps latest pilot-quantum and mini apps from github
     :param hostname:
     :return:
     """
 
-    # Pilot-Streaming
+    # Pilot-quantum
     start = time.time()
-    command = "pip install --upgrade git+ssh://git@github.com/radical-cybertools/pilot-streaming.git"
+    command = "pip install --upgrade git+ssh://git@github.com/radical-cybertools/pilot-quantum.git"
     result = execute_ssh_command(hostname,
                                  user=pilot_compute_description["os_ssh_username"],
                                  command=command,
@@ -165,7 +165,7 @@ def install_pilot_streaming(hostname, pilot_compute_description):
 
     # MINI Apps
     start = time.time()
-    command = "pip install --upgrade git+ssh://git@github.com/radical-cybertools/streaming-miniapps.git"
+    command = "pip install --upgrade git+ssh://git@github.com/radical-cybertools/quantum-miniapps.git"
     result = execute_ssh_command(hostname,
                                  user=pilot_compute_description["os_ssh_username"],
                                  command=command,

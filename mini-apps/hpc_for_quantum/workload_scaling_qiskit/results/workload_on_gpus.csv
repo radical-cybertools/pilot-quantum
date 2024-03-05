@@ -1,6 +1,0 @@
-gpus,pilot-startup,total circuits,qubits,execution time
-4,5,1024,25,15
-8,5,1024,25,8
-16,5,1024,25,3.5
-32,5,1024,25,2.5
-64,5,1024,25,2.25

@@ -61,11 +61,11 @@ class Job(object):
         self.resource_url = saga.Url(str(resource_url))
         self.pilot_compute_description = pilot_compute_description
 
-        self.id="pilot-streaming-ec2" + str(uuid.uuid1())
+        self.id="pilot-quantum-ec2" + str(uuid.uuid1())
         self.subprocess_handle=None
         self.job_timestamp=datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-        self.job_output = open("pilotstreaming_agent_ec2_output_"+self.job_timestamp+".log", "w")
-        self.job_error = open("pilotstreaming_agent_ec2_output__agent_error_"+self.job_timestamp+".log", "w")
+        self.job_output = open("pilotquantum_agent_ec2_output_"+self.job_timestamp+".log", "w")
+        self.job_error = open("pilotquantum_agent_ec2_output__agent_error_"+self.job_timestamp+".log", "w")
 
 
     def run(self):

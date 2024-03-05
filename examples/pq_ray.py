@@ -1,10 +1,11 @@
 import os
 import socket
-
+import time
 import distributed
 import pennylane as qml
 
-import pilot.streaming
+import pilot.pilot_compute_service
+import ray
 
 RESOURCE_URL_HPC = "slurm://localhost"
 WORKING_DIRECTORY = os.path.join(os.environ["PSCRATCH"], "work")
@@ -15,14 +16,15 @@ pilot_compute_description_dask = {
     "number_cores": 1,
     "queue": "normal",
     "walltime": 5,
-    "type": "dask",
+    "type": "ray",
     "project": "m4408",
     "os_ssh_keyfile": "~/.ssh/nersc",
     "scheduler_script_commands": ["#SBATCH --constraint=cpu"]
 }
 
-
+@ray.remote
 def run_circuit():
+    start = time.time()
     wires = 4
     layers = 1
 
@@ -36,20 +38,26 @@ def run_circuit():
     shape = qml.StronglyEntanglingLayers.shape(n_layers=layers, n_wires=wires)
     weights = qml.numpy.random.random(size=shape)
     val = circuit(weights)
-    return val
+    end=time.time()
+    return (end-start)
+
+@ray.remote
+def f(x):
+    return x * x    
 
 
 if __name__ == "__main__":
-    dask_pilot = pilot.streaming.PilotComputeService.create_pilot(pilot_compute_description_dask)
+    ray_pilot = pilot.pilot_compute_service.PilotComputeService.create_pilot(pilot_compute_description_dask)
     print("waiting for dask pilot to start")
-    dask_pilot.wait()
+    ray_pilot.wait()
     print("waiting done for dask pilot to start")
-    print(dask_pilot.get_details())
+    ray_client = ray_pilot.get_context()
+    #ray_client.cluster_resources()
 
-    dask_client = distributed.Client(dask_pilot.get_details()['master_url'])
-    dask_client.scheduler_info()
-
-    print(dask_client.gather(dask_client.map(lambda a: a * a, range(10))))
-    print(dask_client.gather(dask_client.map(lambda a: socket.gethostname(), range(10))))
-    print(dask_client.gather(dask_client.map(lambda a: run_circuit(), range(10))))
-    dask_pilot.cancel()
+    # call the remote function ten times in parallel
+    # and return the results as a list
+    with ray_client:
+        print(ray.get([f.remote(i) for i in range(10)]))
+        print(ray.get([run_circuit.remote() for i in range(10)]))
+    
+    ray_pilot.cancel()

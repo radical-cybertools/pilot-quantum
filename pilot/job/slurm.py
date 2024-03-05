@@ -16,7 +16,7 @@ import signal
 
 logging.basicConfig(datefmt='%m/%d/%Y %I:%M:%S %p',
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(name='pilot-streaming')
+logger = logging.getLogger(name='pilot-quantum')
 
 # logger.basicConfig(datefmt='%m/%d/%Y %I:%M:%S %p',
 #           format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -57,7 +57,7 @@ class Job(object):
         self.command = (("%s %s") % (self.job_description["executable"], args))
         logging.debug("Command: %s"%self.command)
             
-        # Pilot-Streaming Internal UID
+        # Pilot-quantum Internal UID
         self.job_uuid = str(uuid.uuid1())
         self.job_uuid_short =  "ps-%s"%self.job_uuid[:5]
         
