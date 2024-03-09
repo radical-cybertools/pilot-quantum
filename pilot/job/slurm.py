@@ -132,7 +132,7 @@ class Job(object):
         self.pilot_compute_description["walltime_slurm"]=walltime_slurm
 
         self.pilot_compute_description["scheduler_script_commands"] = \
-            job_description["pilot_compute_description"].get("scheduler_script_commands", [])
+            job_description.get("scheduler_script_commands", [])
 
 
        

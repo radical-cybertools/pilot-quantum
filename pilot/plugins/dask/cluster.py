@@ -66,8 +66,10 @@ class Manager():
             executable = "/bin/hostname"
             arguments = ""
 
-        return js, {"executable": executable, "arguments": arguments,
-                    "pilot_compute_description": pilot_compute_description}
+        jd = {"executable": executable, "arguments": arguments}
+        jd.update(pilot_compute_description)
+
+        return js, jd
 
     def submit_job(self, resource_url="fork://localhost", number_of_nodes=1, number_cores=1, cores_per_node=1,
                    spmd_variation=None, queue=None, walltime=None, project=None, reservation=None,
