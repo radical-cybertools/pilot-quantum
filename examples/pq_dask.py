@@ -1,4 +1,3 @@
-import getpass
 import os
 import sys
 
@@ -8,12 +7,12 @@ from pilot.pilot_compute_service import PilotComputeService
 
 sys.path.insert(0, os.path.abspath('../..'))
 
-RESOURCE_URL_HPC = "ssh://localhost"
+RESOURCE_URL_HPC = "slurm://localhost"
 WORKING_DIRECTORY = os.path.join(os.environ["HOME"], "work")
 
 pilot_compute_description_dask = {
-    "resource": "ssh://{}@localhost".format(getpass.getuser()),
-    "working_directory": os.path.join(os.path.expanduser("~"), "work"),
+    "resource": RESOURCE_URL_HPC,
+    "working_directory": WORKING_DIRECTORY,
     "type": "dask"
 }
 
