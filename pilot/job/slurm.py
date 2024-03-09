@@ -53,73 +53,73 @@ class Job(object):
             args =  self.job_description["arguments"]
             if isinstance(self.job_description["arguments"], list):
                 args =  " ".join(self.job_description["arguments"])
-        
+
         self.command = (("%s %s") % (self.job_description["executable"], args))
         logging.debug("Command: %s"%self.command)
-            
+
         # Pilot-quantum Internal UID
         self.job_uuid = str(uuid.uuid1())
         self.job_uuid_short =  "ps-%s"%self.job_uuid[:5]
-        
+
         # Job ID at local resource manager (SLURM)
         self.job_id = ""
-        
+
         # slurm+ssh:// URL for local resource manager endpoint for submission
         self.resource_url = resource_url
-        
+
         o = urlparse(self.resource_url)
         self.target_host = o.netloc
-        
+
         logger.debug("Pilot-Job SLURM: Parsing job description: %s"%str(job_description))
-        
+
         self.pilot_compute_description = {}
-        if 'queue' in job_description or job_description['queue'] is not None or job_description['queue'] != "None": 
+        if 'queue' in job_description or job_description['queue'] is not None or job_description['queue'] != "None":
             self.pilot_compute_description['queue'] = job_description['queue']
 
         logging.debug("Queue: %s"%self.pilot_compute_description['queue'])
-        
-        if 'qos' in job_description: 
+
+        if 'qos' in job_description:
             self.pilot_compute_description['qos'] = job_description['qos']
-        
-        
-        if 'project' in job_description: 
+
+
+        if 'project' in job_description:
             self.pilot_compute_description['project'] = job_description['project']
 
         if 'reservation' in job_description:
             self.pilot_compute_description['reservation'] = job_description['reservation']
-        
+
         self.pilot_compute_description['working_directory'] = os.getcwd()
-        if 'working_directory' in job_description: 
+        if 'working_directory' in job_description:
             self.pilot_compute_description['working_directory'] = job_description['working_directory']
-        
+
         self.pilot_compute_description['output'] = os.path.join(
-            self.pilot_compute_description['working_directory'], 
+            self.pilot_compute_description['working_directory'],
             "ps-%s.stdout"%self.job_uuid_short)
-        
-        if 'output' in job_description: 
+
+        if 'output' in job_description:
             self.pilot_compute_description['output'] = job_description['output']
-        
+
         if 'error' not in job_description:
             self.pilot_compute_description['error'] = os.path.join(self.pilot_compute_description['working_directory'], "ps-%s.stderr"%self.job_uuid_short)
-        
-        if 'error' in job_description: 
+
+        if 'error' in job_description:
             self.pilot_compute_description['error'] = job_description['error']
-        
-        if 'walltime' in job_description: 
+
+        if 'walltime' in job_description:
             self.pilot_compute_description['walltime'] = job_description['walltime']
 
-        
-        #if 'number_cores' in job_description: 
+
+        #if 'number_cores' in job_description:
         #    self.pilot_compute_description['number_cores'] = job_description['number_cores']
 
         self.pilot_compute_description['cores_per_node']=48
-        if 'cores_per_node' in job_description: 
+        if 'cores_per_node' in job_description:
             self.pilot_compute_description['cores_per_node'] = int(job_description['cores_per_node'])
-     
+
         self.pilot_compute_description['number_of_nodes'] = 1
-        if 'number_of_nodes' in job_description: 
+        if 'number_of_nodes' in job_description:
             self.pilot_compute_description['number_of_nodes'] = int(job_description['number_of_nodes'])
-            
+
         self.pilot_compute_description['number_cores']=self.pilot_compute_description['cores_per_node'] * self.pilot_compute_description['number_of_nodes']
 
         self.working_directory = self.pilot_compute_description["working_directory"]
@@ -145,6 +145,7 @@ class Job(object):
         logger.debug("Type Job ID"+str(self.job_uuid_short))
         try:
             fd, tmpf_name = tempfile.mkstemp()
+
             print(tmpf_name)
             with os.fdopen(fd, 'w') as tmp:
                 tmp.write("#!/bin/bash\n")
@@ -175,13 +176,13 @@ class Job(object):
                 tmp.write("%s\n"%self.command)
                 
                 tmp.flush()
-                start_command = ("scp %s %s:~/"%(tmpf_name, target_host))
+                start_command = ("scp %s %s:%s/"%(tmpf_name, self.working_directory, target_host))
                 subprocess.check_call(start_command, shell=True)
         except Exception as err:
             raise Exception("Creation of Batch script failed with error: %s" % err)
 
         start_command = ("ssh %s "%target_host)
-        start_command = start_command + ("sbatch  %s"%os.path.basename(tmpf_name))
+        start_command = start_command + ("sbatch  %s/%s" % (self.working_directory, os.path.basename(tmpf_name)))
         print(("Submission of Job Command: %s"%start_command))
         try:
             outstr = subprocess.check_output(start_command,
@@ -191,9 +192,9 @@ class Job(object):
             logger.debug("Pilot SLURM job submission failed: %s" % err)
             raise err
 
-        start_command = ("ssh %s "%target_host)
-        start_command = start_command + ("rm %s"%os.path.basename(tmpf_name))
-        print(("Cleanup: %s"%start_command))
+        # start_command = ("ssh %s "%target_host)
+        # start_command = start_command + ("rm %s"%os.path.basename(tmpf_name))
+        # print(("Cleanup: %s"%start_command))
         status = subprocess.call(start_command, shell=True)
         self.job_id=self.get_local_job_id(outstr)
         if self.job_id == None or self.job_id == "":
