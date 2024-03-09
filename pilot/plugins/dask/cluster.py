@@ -60,9 +60,6 @@ class Manager():
             if "dask_cores" in pilot_compute_description:
                 arguments = ["-m", "pilot.plugins.dask.bootstrap_dask", "-p", "-t", self.dask_worker_type]
 
-            if extend_job_id:
-                arguments = ["-m", "pilot.plugins.dask.bootstrap_dask", "-t", self.dask_worker_type, "-j",
-                             extend_job_id]
             logging.debug("Run %s Args: %s", executable, str(arguments))
         else:
             js = pilot.job.ssh.Service(resource_url)
