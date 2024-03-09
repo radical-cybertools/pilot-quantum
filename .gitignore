@@ -2,3 +2,6 @@
 *.log
 .idea
 .DS_Store
+Pilot_Quantum.egg-info/
+build/
+dist/

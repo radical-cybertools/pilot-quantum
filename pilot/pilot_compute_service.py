@@ -61,19 +61,23 @@ class PilotComputeService:
 
         manager = self.__get_cluster_manager(framework_type, working_directory)
 
-        batch_job = manager.submit_job(
-            resource_url=resource_url,
-            number_of_nodes=number_of_nodes,
-            number_cores=number_cores,
-            cores_per_node=cores_per_node,
-            queue=queue,
-            walltime=wall_time,
-            project=project,
-            reservation=reservation,
-            config_name=config_name,
-            extend_job_id=parent,
-            pilot_compute_description=pilot_compute_description
-        )
+        if framework_type.startswith("dask"):
+            batch_job = manager.submit_job(pilot_compute_description)
+        else:
+            batch_job = manager.submit_job(
+                resource_url=resource_url,
+                number_of_nodes=number_of_nodes,
+                number_cores=number_cores,
+                cores_per_node=cores_per_node,
+                queue=queue,
+                walltime=wall_time,
+                project=project,
+                reservation=reservation,
+                config_name=config_name,
+                extend_job_id=parent,
+                pilot_compute_description=pilot_compute_description
+            )
+
 
         details = manager.get_config_data()
         self.logger.info(f"Cluster details: {details}")
@@ -89,14 +93,13 @@ class PilotComputeService:
         :return: ClusterManager instance.
         """
         if framework_type.startswith("dask"):
-            job_id = f"dask-{uuid.uuid1()}"
-            return dask_cluster_manager.Manager(job_id, working_directory)  # Replace with appropriate manager
+            return dask_cluster_manager.Manager()  # Replace with appropriate manager
         elif framework_type == "ray":
             job_id = f"ray-{uuid.uuid1()}"
             return ray_cluster_manager.Manager(job_id, working_directory)  # Replace with appropriate manager
-        else:
-            self.logger.error(f"Invalid Pilot Compute Description: invalid type: {framework_type}")
-            raise PilotAPIException(f"Invalid Pilot Compute Description: invalid type: {framework_type}")
+
+        self.logger.error(f"Invalid Pilot Compute Description: invalid type: {framework_type}")
+        raise PilotAPIException(f"Invalid Pilot Compute Description: invalid type: {framework_type}")
 
 
 class PilotAPIException(Exception):

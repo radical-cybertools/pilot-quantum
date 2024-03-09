@@ -9,6 +9,7 @@ import sys
 import time
 from datetime import datetime
 from urllib.parse import urlparse
+import uuid
 
 import distributed
 import numpy as np
@@ -22,26 +23,14 @@ logging.getLogger("tornado.application").setLevel(logging.CRITICAL)
 logging.getLogger("distributed.utils").setLevel(logging.CRITICAL)
 
 
-class Manager():
-
-    def __init__(self, jobid, working_directory):
+class Manager:
+    def __init__(self, job_id=None):
         self.dask_client = None
-        self.jobid = jobid
-        self.working_directory = os.path.join(working_directory, jobid)
-        self.pilot_compute_description = None
-        self.job = None
-        self.local_id = None
-        self.dask_cluster = None
-        self.dask_worker_type = "dask"
+        self.job_id = job_id
+        if not self.job_id:
+            self.job_id = f"dask-{uuid.uuid1()}"
 
-        self._create_working_dir()
 
-    def _create_working_dir(self):
-        try:
-            os.makedirs(self.working_directory)
-            logging.info(f"Created working directory {self.working_directory} successfully")
-        except FileExistsError:
-            logging.info(f"working directory {self.working_directory} already exists")
 
     def _configure_logging(self):
         logging.basicConfig(
@@ -50,7 +39,9 @@ class Manager():
             format="%(asctime)s - %(levelname)s - %(message)s"
         )
 
-    def _setup_job(self, resource_url, pilot_compute_description):
+    def _setup_job(self, pilot_compute_description):
+        resource_url = pilot_compute_description["resource"]
+
         url_scheme = urlparse(resource_url).scheme
 
         if url_scheme.startswith("slurm"):
@@ -71,22 +62,25 @@ class Manager():
 
         return js, jd
 
-    def submit_job(self, resource_url="fork://localhost", number_of_nodes=1, number_cores=1, cores_per_node=1,
-                   spmd_variation=None, queue=None, walltime=None, project=None, reservation=None,
-                   config_name="default",
-                   extend_job_id=None, pilot_compute_description=None):
+    def submit_job(self, pilot_compute_description):
         try:
-            self._configure_logging()
-            job_service, job_description = self._setup_job(resource_url, pilot_compute_description)
             self.pilot_compute_description = pilot_compute_description
+            self.pilot_compute_description["working_directory"] = os.path.join(self.pilot_compute_description["working_directory"], self.job_id)
+            self.working_directory = self.pilot_compute_description["working_directory"]
             self.dask_worker_type = self.pilot_compute_description["type"]
+
+            self._configure_logging()
+
+            job_service, job_description = self._setup_job(pilot_compute_description)
 
             self.job = job_service.create_job(job_description)
             self.job.run()
-            self.local_id = self.job.get_id()
-            logging.info("Job: %s State: %s", str(self.local_id), self.job.get_state())
+            self.batch_job_id = self.job.get_id()
+            logging.info("Job: %s State: %s", str(self.batch_job_id), self.job.get_state())
 
-            if not resource_url.startswith("slurm"):
+
+
+            if not job_service.resource_url.startswith("slurm"):
                 self.run_dask()  # run dask on cloud platforms
 
             return self.job
@@ -151,7 +145,7 @@ class Manager():
     def wait(self):
         while True:
             state = self.job.get_state()
-            logging.debug("**** Job: " + str(self.local_id) + " State: %s" % (state))
+            logging.debug("**** Job: " + str(self.batch_job_id) + " State: %s" % (state))
             if state.lower() == "running":
                 logging.debug("Looking for Dask startup state at: %s" % self.working_directory)
                 if self.is_scheduler_started():
