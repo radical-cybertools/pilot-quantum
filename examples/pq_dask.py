@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 
 import pennylane as qml
 
@@ -49,15 +50,27 @@ def pennylane_quantum_circuit():
 
 
 if __name__ == "__main__":
-    # Start Pilot
-    dask_pilot = start_pilot()
+    dask_pilot, dask_client = None, None
 
-    # Get Dask client details
-    dask_client = dask_pilot.get_client()
-    print(dask_client.scheduler_info())
+    try:
+        # Start Pilot
+        dask_pilot = start_pilot()
 
-    # Execute Classical tasks
-    print(dask_client.gather(dask_client.map(square, range(10))))
+        # Get Dask client details
+        dask_client = dask_pilot.get_client()
+        print(dask_client.scheduler_info())
 
-    # Execute Quantum tasks
-    print(dask_client.gather(dask_client.map(lambda a: pennylane_quantum_circuit(), range(10))))
+        # Execute Classical tasks
+        print(dask_client.gather(dask_client.map(square, range(10))))
+
+        # Execute Quantum tasks
+        print(dask_client.gather(dask_client.map(lambda a: pennylane_quantum_circuit(), range(10))))
+
+    except Exception as ex:
+        if dask_pilot:
+            if dask_client:
+                dask_client.close()
+                time.sleep(2)
+            dask_pilot.cancel()
+
+
