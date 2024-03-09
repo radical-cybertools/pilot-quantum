@@ -218,7 +218,7 @@ class Job(object):
         
 
     def cancel(self):
-        logger.debug("Cancel SLURM job")
+        logger.info("Cancel SLURM job")
         start_command=("%s %s"%("scancel", self.job_id ))
         output = subprocess.check_output(start_command, shell=True).decode("utf-8") 
         logging.debug("Cancel SLURM job: %s Output: %s"%(start_command, output))        

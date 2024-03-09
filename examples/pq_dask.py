@@ -66,10 +66,7 @@ if __name__ == "__main__":
 
         # Execute Quantum tasks
         print(dask_client.gather(dask_client.map(lambda a: pennylane_quantum_circuit(), range(10))))
-        if dask_client:
-            dask_client.close()
-            time.sleep(2)
-    except Exception as ex:
+    finally:
         if dask_pilot:
             dask_pilot.cancel()
 
