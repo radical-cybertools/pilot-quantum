@@ -165,7 +165,7 @@ class Job(object):
                 tmp.write("#SBATCH -o %s\n"%self.pilot_compute_description["output"])
                 tmp.write("#SBATCH -e %s\n"%self.pilot_compute_description["error"])
                 if "queue" in self.pilot_compute_description and self.pilot_compute_description["queue"] != "None" and self.pilot_compute_description["queue"] != None:
-                    tmp.write("#SBATCH -p %s\n"%self.pilot_compute_description["queue"])
+                    tmp.write("#SBATCH -q %s\n"%self.pilot_compute_description["queue"])
                 if "qos" in self.pilot_compute_description:
                     tmp.write("#SBATCH --qos %s\n"%self.pilot_compute_description["qos"])
                 
