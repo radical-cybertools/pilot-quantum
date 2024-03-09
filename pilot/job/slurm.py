@@ -176,13 +176,13 @@ class Job(object):
                 tmp.write("%s\n"%self.command)
                 
                 tmp.flush()
-                start_command = ("scp %s %s:%s"%(tmpf_name, target_host, self.working_directory))
+                start_command = ("scp %s %s:~/"%(tmpf_name, target_host))
                 subprocess.check_call(start_command, shell=True)
         except Exception as err:
             raise Exception("Creation of Batch script failed with error: %s" % err)
 
         start_command = ("ssh %s "%target_host)
-        start_command = start_command + ("sbatch  %s/%s" % (self.working_directory, os.path.basename(tmpf_name)))
+        start_command = start_command + ("sbatch  %s"%os.path.basename(tmpf_name))
         print(("Submission of Job Command: %s"%start_command))
         try:
             outstr = subprocess.check_output(start_command,
@@ -192,9 +192,9 @@ class Job(object):
             logger.debug("Pilot SLURM job submission failed: %s" % err)
             raise err
 
-        # start_command = ("ssh %s "%target_host)
-        # start_command = start_command + ("rm %s"%os.path.basename(tmpf_name))
-        # print(("Cleanup: %s"%start_command))
+        start_command = ("ssh %s "%target_host)
+        start_command = start_command + ("rm %s"%os.path.basename(tmpf_name))
+        print(("Cleanup: %s"%start_command))
         status = subprocess.call(start_command, shell=True)
         self.job_id=self.get_local_job_id(outstr)
         if self.job_id == None or self.job_id == "":

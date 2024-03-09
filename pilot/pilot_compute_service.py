@@ -122,7 +122,7 @@ class PilotCompute(object):
         self.cluster_manager = cluster_manager
 
     def cancel(self):
-        self.cluster_manager.cancel()
+        # self.cluster_manager.cancel()
 
         if self.saga_job:
             self.saga_job.cancel()
