@@ -176,7 +176,7 @@ class Job(object):
                 tmp.write("%s\n"%self.command)
                 
                 tmp.flush()
-                start_command = ("scp %s %s:%s"%(tmpf_name, self.working_directory, target_host))
+                start_command = ("scp %s %s:%s"%(tmpf_name, target_host, self.working_directory))
                 subprocess.check_call(start_command, shell=True)
         except Exception as err:
             raise Exception("Creation of Batch script failed with error: %s" % err)
