@@ -13,7 +13,12 @@ WORKING_DIRECTORY = os.path.join(os.environ["HOME"], "work")
 pilot_compute_description_dask = {
     "resource": RESOURCE_URL_HPC,
     "working_directory": WORKING_DIRECTORY,
-    "type": "dask"
+    "queue": "regular",
+    "type": "dask",
+    "walltime": 5,
+    "project": "m4408",
+    "number_cores": 2,
+    "scheduler_script_commands": ["#SBATCH --constraint=cpu"]
 }
 
 
