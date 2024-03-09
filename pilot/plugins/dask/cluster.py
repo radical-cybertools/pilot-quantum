@@ -69,6 +69,7 @@ class Manager:
             self.working_directory = self.pilot_compute_description["working_directory"]
             self.dask_worker_type = self.pilot_compute_description["type"]
 
+            os.makedirs(self.working_directory)
             self._configure_logging()
 
             job_service, job_description = self._setup_job(pilot_compute_description)
