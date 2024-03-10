@@ -17,11 +17,9 @@ import numpy as np
 logging.getLogger("tornado.application").setLevel(logging.CRITICAL)
 logging.getLogger("distributed.utils").setLevel(logging.CRITICAL)
 
-# Resource Managers supported by Dask Pilot-Streaming Plugin
+# Resource Managers supported by Dask Pilot-quantum Plugin
 import pilot.job.slurm
-import pilot.job.ec2
 import pilot.job.ssh
-import pilot.job.pilot_os
 from urllib.parse import urlparse
 
 from pilot.util.ssh_utils import execute_ssh_command, execute_ssh_command_as_daemon
@@ -78,10 +76,6 @@ class Manager():
             js = None
             if url_schema.startswith("slurm"):
                 js = pilot.job.slurm.Service(resource_url)
-            elif url_schema.startswith("ec2"):
-                js = pilot.job.ec2.Service(resource_url)
-            elif url_schema.startswith("os"):
-                js = pilot.job.os.Service(resource_url)
             elif url_schema.startswith("ssh"):
                 js = pilot.job.ssh.Service(resource_url)
             else:

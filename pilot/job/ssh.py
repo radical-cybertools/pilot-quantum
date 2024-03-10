@@ -59,6 +59,7 @@ class Job(object):
         self.pilot_compute_description = job_description
 
         self.working_directory = os.getcwd()
+
         if "working_directory" in self.job_description:
             self.working_directory = self.job_description["working_directory"]
             print("Working Directory: %s" % self.working_directory)
@@ -67,6 +68,7 @@ class Job(object):
             except:
                 pass
 
+        print(f"**************working_directory {self.working_directory}, {self.job_description}")
         # if pilot_compute_description == None:
         #     self.pilot_compute_description = job_description
         # else:
@@ -77,13 +79,13 @@ class Job(object):
         if urlparse(resource_url).username is not None:
             self.user = urlparse(resource_url).username
         logger.debug("URL: " + str(self.resource_url) + " Host: " + self.host)
-        self.id = "pilot-streaming-ssh" + str(uuid.uuid1())
+        self.id = "pilot-quantum-ssh" + str(uuid.uuid1())
         self.job_id = self.id
         self.job_timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         self.job_output = open(
-                                os.path.join(self.working_directory,"pilotstreaming_agent_ssh_output_" + self.job_timestamp + ".log"), "w")
+                                os.path.join(self.working_directory,"pilotquantum_agent_ssh_output_" + self.job_timestamp + ".log"), "w")
         self.job_error = open(
-                              os.path.join(self.working_directory, "pilotstreaming_agent_ssh_error_" + self.job_timestamp + ".log"), "w")
+                              os.path.join(self.working_directory, "pilotquantum_agent_ssh_error_" + self.job_timestamp + ".log"), "w")
         self.ssh_process = None
 
     def run(self):

@@ -16,7 +16,7 @@ import signal
 
 logging.basicConfig(datefmt='%m/%d/%Y %I:%M:%S %p',
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(name='pilot-streaming')
+logger = logging.getLogger(name='pilot-quantum')
 
 # logger.basicConfig(datefmt='%m/%d/%Y %I:%M:%S %p',
 #           format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -53,73 +53,73 @@ class Job(object):
             args =  self.job_description["arguments"]
             if isinstance(self.job_description["arguments"], list):
                 args =  " ".join(self.job_description["arguments"])
-        
+
         self.command = (("%s %s") % (self.job_description["executable"], args))
         logging.debug("Command: %s"%self.command)
-            
-        # Pilot-Streaming Internal UID
+
+        # Pilot-quantum Internal UID
         self.job_uuid = str(uuid.uuid1())
         self.job_uuid_short =  "ps-%s"%self.job_uuid[:5]
-        
+
         # Job ID at local resource manager (SLURM)
         self.job_id = ""
-        
+
         # slurm+ssh:// URL for local resource manager endpoint for submission
         self.resource_url = resource_url
-        
+
         o = urlparse(self.resource_url)
         self.target_host = o.netloc
-        
+
         logger.debug("Pilot-Job SLURM: Parsing job description: %s"%str(job_description))
-        
+
         self.pilot_compute_description = {}
-        if 'queue' in job_description or job_description['queue'] is not None or job_description['queue'] != "None": 
+        if 'queue' in job_description or job_description['queue'] is not None or job_description['queue'] != "None":
             self.pilot_compute_description['queue'] = job_description['queue']
 
         logging.debug("Queue: %s"%self.pilot_compute_description['queue'])
-        
-        if 'qos' in job_description: 
+
+        if 'qos' in job_description:
             self.pilot_compute_description['qos'] = job_description['qos']
-        
-        
-        if 'project' in job_description: 
+
+
+        if 'project' in job_description:
             self.pilot_compute_description['project'] = job_description['project']
 
         if 'reservation' in job_description:
             self.pilot_compute_description['reservation'] = job_description['reservation']
-        
+
         self.pilot_compute_description['working_directory'] = os.getcwd()
-        if 'working_directory' in job_description: 
+        if 'working_directory' in job_description:
             self.pilot_compute_description['working_directory'] = job_description['working_directory']
-        
+
         self.pilot_compute_description['output'] = os.path.join(
-            self.pilot_compute_description['working_directory'], 
+            self.pilot_compute_description['working_directory'],
             "ps-%s.stdout"%self.job_uuid_short)
-        
-        if 'output' in job_description: 
+
+        if 'output' in job_description:
             self.pilot_compute_description['output'] = job_description['output']
-        
+
         if 'error' not in job_description:
             self.pilot_compute_description['error'] = os.path.join(self.pilot_compute_description['working_directory'], "ps-%s.stderr"%self.job_uuid_short)
-        
-        if 'error' in job_description: 
+
+        if 'error' in job_description:
             self.pilot_compute_description['error'] = job_description['error']
-        
-        if 'walltime' in job_description: 
+
+        if 'walltime' in job_description:
             self.pilot_compute_description['walltime'] = job_description['walltime']
 
-        
-        #if 'number_cores' in job_description: 
+
+        #if 'number_cores' in job_description:
         #    self.pilot_compute_description['number_cores'] = job_description['number_cores']
 
         self.pilot_compute_description['cores_per_node']=48
-        if 'cores_per_node' in job_description: 
+        if 'cores_per_node' in job_description:
             self.pilot_compute_description['cores_per_node'] = int(job_description['cores_per_node'])
-     
+
         self.pilot_compute_description['number_of_nodes'] = 1
-        if 'number_of_nodes' in job_description: 
+        if 'number_of_nodes' in job_description:
             self.pilot_compute_description['number_of_nodes'] = int(job_description['number_of_nodes'])
-            
+
         self.pilot_compute_description['number_cores']=self.pilot_compute_description['cores_per_node'] * self.pilot_compute_description['number_of_nodes']
 
         self.working_directory = self.pilot_compute_description["working_directory"]
@@ -132,7 +132,7 @@ class Job(object):
         self.pilot_compute_description["walltime_slurm"]=walltime_slurm
 
         self.pilot_compute_description["scheduler_script_commands"] = \
-            job_description["pilot_compute_description"].get("scheduler_script_commands", [])
+            job_description.get("scheduler_script_commands", [])
 
 
        
@@ -145,6 +145,7 @@ class Job(object):
         logger.debug("Type Job ID"+str(self.job_uuid_short))
         try:
             fd, tmpf_name = tempfile.mkstemp()
+
             print(tmpf_name)
             with os.fdopen(fd, 'w') as tmp:
                 tmp.write("#!/bin/bash\n")
@@ -164,7 +165,7 @@ class Job(object):
                 tmp.write("#SBATCH -o %s\n"%self.pilot_compute_description["output"])
                 tmp.write("#SBATCH -e %s\n"%self.pilot_compute_description["error"])
                 if "queue" in self.pilot_compute_description and self.pilot_compute_description["queue"] != "None" and self.pilot_compute_description["queue"] != None:
-                    tmp.write("#SBATCH -p %s\n"%self.pilot_compute_description["queue"])
+                    tmp.write("#SBATCH -q %s\n"%self.pilot_compute_description["queue"])
                 if "qos" in self.pilot_compute_description:
                     tmp.write("#SBATCH --qos %s\n"%self.pilot_compute_description["qos"])
                 
@@ -217,7 +218,7 @@ class Job(object):
         
 
     def cancel(self):
-        logger.debug("Cancel SLURM job")
+        logger.info("Cancel SLURM job")
         start_command=("%s %s"%("scancel", self.job_id ))
         output = subprocess.check_output(start_command, shell=True).decode("utf-8") 
         logging.debug("Cancel SLURM job: %s Output: %s"%(start_command, output))        
