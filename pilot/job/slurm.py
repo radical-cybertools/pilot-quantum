@@ -59,7 +59,7 @@ class Job(object):
 
         # Pilot-quantum Internal UID
         self.job_uuid = str(uuid.uuid1())
-        self.job_uuid_short =  "ps-%s"%self.job_uuid[:5]
+        self.job_uuid_short =  "pq-%s"%self.job_uuid[:5]
 
         # Job ID at local resource manager (SLURM)
         self.job_id = ""
@@ -94,13 +94,13 @@ class Job(object):
 
         self.pilot_compute_description['output'] = os.path.join(
             self.pilot_compute_description['working_directory'],
-            "ps-%s.stdout"%self.job_uuid_short)
+            "pq-%s.stdout"%self.job_uuid_short)
 
         if 'output' in job_description:
             self.pilot_compute_description['output'] = job_description['output']
 
         if 'error' not in job_description:
-            self.pilot_compute_description['error'] = os.path.join(self.pilot_compute_description['working_directory'], "ps-%s.stderr"%self.job_uuid_short)
+            self.pilot_compute_description['error'] = os.path.join(self.pilot_compute_description['working_directory'], "pq-%s.stderr"%self.job_uuid_short)
 
         if 'error' in job_description:
             self.pilot_compute_description['error'] = job_description['error']

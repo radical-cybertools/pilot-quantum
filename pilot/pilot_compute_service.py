@@ -61,7 +61,7 @@ class PilotComputeService:
 
         manager = self.__get_cluster_manager(framework_type, working_directory)
 
-        if framework_type.startswith("dask"):
+        if framework_type.startswith("dask") or framework_type.startswith("ray"):
             batch_job = manager.submit_job(pilot_compute_description)
         else:
             batch_job = manager.submit_job(

@@ -10,6 +10,7 @@ import os
 import sys
 import time
 from datetime import datetime
+import uuid
 import ray
 
 import numpy as np
@@ -27,19 +28,21 @@ from pilot.util.ssh_utils import execute_ssh_command, execute_ssh_command_as_dae
 class Manager():
 
     def __init__(self, 
-                 jobid, 
+                 job_id, 
                  working_directory):
         
-        self.jobid = jobid
-        #print("{}{}".format(self.jobid, working_directory))
-        self.working_directory = os.path.join(working_directory, jobid)
+        self.job_id = job_id
+        if not self.job_id:
+            self.job_id = f"ray-{uuid.uuid1()}"
+        #print("{}{}".format(self.job_id, working_directory))
+        self.working_directory = os.path.join(working_directory, self.job_id)
         # create working directory if not exists
         if not os.path.exists(self.working_directory):
             os.makedirs(self.working_directory)
 
         self.start_agent_working_directory = working_directory
         self.pilot_compute_description = None
-        self.myjob = None  # SAGA Job
+        self.job = None  # SAGA Job
         self.local_id = None  # Local Resource Manager ID (e.g. SLURM id)
         self.ray_process = None
         self.ray_cluster = None
@@ -55,40 +58,24 @@ class Manager():
         except:
             pass
 
-    # Ray 2.7.0
-    def submit_job(self,
-                   resource_url="fork://localhost",
-                   number_of_nodes=1,
-                   number_cores=1,
-                   cores_per_node=1,
-                   spmd_variation=None,
-                   queue=None,
-                   walltime=None,
-                   project=None,
-                   reservation=None,
-                   config_name="default",
-                   extend_job_id=None,
-                   pilot_compute_description=None
-                   ):
-        try:
-            # create a job service for SLURM LRMS or EC2 Cloud
-            url_schema = urlparse(resource_url).scheme
-            js = None
-            if url_schema.startswith("slurm"):
-                js = pilot.job.slurm.Service(resource_url)
-            elif url_schema.startswith("ssh"):
-                js = pilot.job.ssh.Service(resource_url)
-            else:
-                print("Unsupported URL Schema: %s " % resource_url)
-                return
 
-            self.pilot_compute_description = pilot_compute_description
+    def _configure_logging(self):
+        logging.basicConfig(
+            filename=os.path.join(self.working_directory, "pilot_quantum_ray.log"),
+            level=logging.DEBUG,
+            format="%(asctime)s - %(levelname)s - %(message)s"
+        )
+    
+    def _setup_job(self, pilot_compute_description):
+        resource_url = pilot_compute_description["resource"]
 
-            # if url_schema.startswith("slurm"):
-            #  SLURM plugin
+        url_scheme = urlparse(resource_url).scheme
+
+        if url_scheme.startswith("slurm"):
+            js = pilot.job.slurm.Service(resource_url)
             executable = "python"
             arguments = ["-m", "pilot.plugins.ray.bootstrap_ray",
-                         "-j", self.jobid]
+                         "-j", self.job_id]
             if "cores_per_node" in pilot_compute_description:
                 arguments.append(" -p ")
                 arguments.append(str(pilot_compute_description["cores_per_node"]))
@@ -102,36 +89,106 @@ class Manager():
                 arguments.append(str(pilot_compute_description["working_directory"]))
             
             logging.debug("Run %s Args: %s" % (executable, str(arguments)))
-            # else:
-            #     # EC2 / OS / SSH plugin
-            #     # Boostrap of ray is done after ssh machine is initialized
-            #     executable = "/bin/hostname"  # not required - just starting vms
-            #     arguments = ""  # not required - just starting vms
-            
-            jd = {
-                "executable": executable,
-                "arguments": arguments,
-                "working_directory": self.start_agent_working_directory,
-                "output": "ray_job_%s.stdout" % self.jobid,
-                "error": "ray_job_%s.stderr" % self.jobid,
-                "number_of_nodes": number_of_nodes,
-                "cores_per_node": cores_per_node,
-                "project": project,
-                "reservation": reservation,
-                "queue": queue,
-                "walltime": walltime,
-                "pilot_compute_description": pilot_compute_description
-            }
-            self.myjob = js.create_job(jd)
-            self.myjob.run()
-            self.local_id = self.myjob.get_id()
-            print("**** Job: {0} State: {1}".format(self.local_id, 
-                                                    self.myjob.get_state()))
-            # if not url_schema.startswith("slurm"):  # Ray is started in SLURM 
-            #                                         #script. This is for ec2, openstack and ssh adaptors
-            #     self.run_ray()  # run dask on cloud platforms
+        else:
+            js = pilot.job.ssh.Service(resource_url)
+            executable = "/bin/hostname"
+            arguments = ""
 
-            return self.myjob
+        jd = {"executable": executable, "arguments": arguments}
+        jd.update(pilot_compute_description)
+
+        return js, jd
+
+    # Ray 2.9.3
+    def submit_job(self,
+                   pilot_compute_description=None
+                   ):
+        try:
+            self.pilot_compute_description = pilot_compute_description
+            self.pilot_compute_description["working_directory"] = os.path.join(self.pilot_compute_description["working_directory"], self.job_id)
+            self.working_directory = self.pilot_compute_description["working_directory"]
+            try:
+                os.makedirs(self.working_directory)
+            except:
+                pass
+
+            self._configure_logging()
+
+            job_service, job_description = self._setup_job(pilot_compute_description)
+
+            self.job = job_service.create_job(job_description)
+            self.job.run()
+            self.batch_job_id = self.job.get_id()
+            logging.info("Job: %s State: %s", str(self.batch_job_id), self.job.get_state())
+            
+            if not job_service.resource_url.startswith("slurm"):
+                self.run_dask()  # run dask on cloud platforms
+
+            return self.job
+
+
+            # create a job service for SLURM LRMS or EC2 Cloud
+            # resource_url = pilot_compute_description["resource"]
+            # url_schema = urlparse(resource_url).scheme
+            # js = None
+            # if url_schema.startswith("slurm"):
+            #     js = pilot.job.slurm.Service(resource_url)
+            # elif url_schema.startswith("ssh"):
+            #     js = pilot.job.ssh.Service(resource_url)
+            # else:
+            #     print("Unsupported URL Schema: %s " % resource_url)
+            #     return
+
+            # self.pilot_compute_description = pilot_compute_description
+
+            # # if url_schema.startswith("slurm"):
+            # #  SLURM plugin
+            # executable = "python"
+            # arguments = ["-m", "pilot.plugins.ray.bootstrap_ray",
+            #              "-j", self.job_id]
+            # if "cores_per_node" in pilot_compute_description:
+            #     arguments.append(" -p ")
+            #     arguments.append(str(pilot_compute_description["cores_per_node"]))
+            
+            # if  "gpus_per_node" in pilot_compute_description:            
+            #     arguments.append(" -g ")
+            #     arguments.append(str(pilot_compute_description["gpus_per_node"]))
+            
+            # if "working_directory" in pilot_compute_description:
+            #     arguments.append(" -w ")
+            #     arguments.append(str(pilot_compute_description["working_directory"]))
+            
+            # logging.debug("Run %s Args: %s" % (executable, str(arguments)))
+            # # else:
+            # #     # EC2 / OS / SSH plugin
+            # #     # Boostrap of ray is done after ssh machine is initialized
+            # #     executable = "/bin/hostname"  # not required - just starting vms
+            # #     arguments = ""  # not required - just starting vms
+            
+            # jd = {
+            #     "executable": executable,
+            #     "arguments": arguments,
+            #     "working_directory": self.start_agent_working_directory,
+            #     "output": "ray_job_%s.stdout" % self.job_id,
+            #     "error": "ray_job_%s.stderr" % self.job_id,
+            #     "number_of_nodes": number_of_nodes,
+            #     "cores_per_node": cores_per_node,
+            #     "project": project,
+            #     "reservation": reservation,
+            #     "queue": queue,
+            #     "walltime": walltime,
+            #     "pilot_compute_description": pilot_compute_description
+            # }
+            # self.myjob = js.create_job(jd)
+            # self.myjob.run()
+            # self.local_id = self.myjob.get_id()
+            # print("**** Job: {0} State: {1}".format(self.local_id, 
+            #                                         self.myjob.get_state()))
+            # # if not url_schema.startswith("slurm"):  # Ray is started in SLURM 
+            # #                                         #script. This is for ec2, openstack and ssh adaptors
+            # #     self.run_ray()  # run dask on cloud platforms
+
+            # return self.myjob
         except Exception as ex:
             print("An error occurred: %s" % (str(ex)))
             raise ex
@@ -139,7 +196,7 @@ class Manager():
 
     def wait(self):
         while True:
-            state = self.myjob.get_state()
+            state = self.job.get_state()
             logging.debug("**** Job: " + str(self.local_id) + " State: %s" % (state))
             if state.lower() == "running":
                 logging.debug("Looking for Ray startup state at: %s" % self.working_directory)
@@ -161,7 +218,7 @@ class Manager():
         # c = self.get_context()
         # ray.client().disconnect()
         # ray.shutdown()
-        self.myjob.cancel()
+        self.job.cancel()
 
     def submit_compute_unit(function_name):
         pass
@@ -195,7 +252,7 @@ class Manager():
         return self.ray_client 
 
     def get_jobid(self):
-        return self.jobid
+        return self.job_id
 
     def get_config_data(self):
         if not self.is_scheduler_started():

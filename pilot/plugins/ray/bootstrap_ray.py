@@ -178,6 +178,7 @@ class RayBootstrap():
         #                       dashboard_host=self.nodes[0], num_cpus=0, num_gpus=0)
         
         self.ray_headnode_address = self.nodes[0]
+        # TODO clean conda env
         cmd = "conda activate pilot-quantum; ray stop; export RAY_ENABLE_WINDOWS_OR_OSX_CLUSTER=1; ray start --head   --dashboard-host=%s --num-cpus=0 --num-gpus=0 --ray-client-server-port=10001"%(self.ray_headnode_address)
         print("Start Ray Head Node with command: %s"%(cmd))
         result=execute_ssh_command(host=self.ray_headnode_address, 
@@ -287,13 +288,16 @@ if __name__ == "__main__" :
     (options, args) = parser.parse_args()
     config_name=options.config_name
 
-    logging.debug("Create job directory {} within working directory {}".format(options.jobid, options.working_directory))
-
-    working_directory = os.path.join(options.working_directory, options.jobid)
-    try:
-        os.makedirs(working_directory)
-    except:
-        pass
+    # check whether current directory contains the string of the jobid
+    if options.jobid in os.getcwd():
+        working_directory = os.getcwd()
+    else:       
+        logging.debug("Create job directory {} within working directory {}".format(options.jobid, options.working_directory))
+        working_directory = os.path.join(options.working_directory, options.jobid)
+        try:
+            os.makedirs(working_directory)
+        except:
+            pass
 
     logging.debug("Check Ray Installation on " + socket.gethostname())
     try:

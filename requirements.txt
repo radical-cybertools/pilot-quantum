@@ -1,8 +1,9 @@
 python-hostlist==1.23.0
 setuptools>=66.0.0
-dask==2023.11.0
-distributed==2023.11.0
-ray==2.8.0
+dask~=2024.3.1
+distributed~=2024.3.1
+ray[all]~=2.9.3
 argparse~=1.4.0
 paramiko>=3.4.0
 asyncssh==2.14.2
+pennylane

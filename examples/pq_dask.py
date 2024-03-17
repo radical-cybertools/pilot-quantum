@@ -18,8 +18,8 @@ pilot_compute_description_dask = {
     "type": "dask",
     "walltime": 5,
     "project": "m4408",
-    "number_of_nodes": 2,
-    "cores_per_node": 2,
+    "number_of_nodes": 1,
+    "cores_per_node": 24,
     "scheduler_script_commands": ["#SBATCH --constraint=cpu"]
 }
 

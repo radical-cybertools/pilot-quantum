@@ -9,10 +9,9 @@ Pilot-Quantum is presented as a Quantum-HPC middleware framework designed to add
 Requirements:
 
 	* SLURM/PBS/Torque cluster
-	* Setup password-less documentation
-	
+	* Setup password-less documentation, e.g.,  using sshproxy on Perlmutter.
 
-Anaconda is the preferred distribution
+Anaconda or Miniconda is the preferred distribution
 
 
 ## Installation
@@ -26,3 +25,8 @@ The best way to utilize Pilot-Quantum is Anaconda, which provides an easy way to
 To install Pilot-Quantum type:
 
     python setup.py install
+
+
+## Hints
+
+Your default conda environment should contain all Pilot-Quantum and application dependencies. Activate it, e.g., in the `.bashrc`.

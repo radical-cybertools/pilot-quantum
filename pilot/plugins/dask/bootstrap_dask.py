@@ -334,9 +334,7 @@ if __name__ == "__main__":
     else:
         dask.stop()
         if options.clean:
-            directory = "/tmp/zookeeper/"
-            logging.debug("delete: " + directory)
-            shutil.rmtree(directory)
+            pass
         sys.exit(0)
 
     logging.debug("Finished launching of Dask Cluster - Sleeping now")

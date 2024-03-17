@@ -52,7 +52,7 @@ def create_manifest():
 setup(name='Pilot-Quantum',
       version=get_version(),
       description='Framework for Management of Quantum-HPC applications on HPC clusters (Torque/PBS/SLURM)',
-      author='Andre Luckow',
+      author='Andre Luckow, Pradeep Mantha',
       author_email='aluckow@clemson.edu',
       url='https://github.com/radical-cybertools/pilot-quantum',
       classifiers=['Development Status :: 5 - Production/Stable',
