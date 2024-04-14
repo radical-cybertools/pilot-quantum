@@ -120,6 +120,7 @@ class PilotCompute(object):
     def __init__(self, saga_job=None, cluster_manager=None):
         self.saga_job = saga_job
         self.cluster_manager = cluster_manager
+        self.client = None
 
     def cancel(self):
         # self.cluster_manager.cancel()
@@ -129,6 +130,23 @@ class PilotCompute(object):
 
     def submit(self, function_name):
         self.cluster_manager.submit_compute_unit(function_name)
+
+    def task(self, func):
+        def wrapper(*args, **kwargs):
+            return self.client.submit(func, *args, **kwargs)
+
+        return wrapper
+
+    def run_sync_task(self, func, *args, **kwargs):
+        if not self.client:
+            self.client = self.get_client()
+
+        if self.client is None:
+            raise PilotAPIException("Cluster client isn't ready/provisioned yet")
+
+        print(f"Running qtask with args {args}, kwargs {kwargs}")
+        wrapper_func = self.task(func)
+        return wrapper_func(*args, **kwargs).result()
 
     def get_state(self):
         if self.saga_job:
