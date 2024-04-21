@@ -1,15 +1,15 @@
 import pennylane as qml
 from pennylane import numpy as np
 import matplotlib.pyplot as plt
-
 from pilot.pilot_compute_service import PilotComputeService
 
+plt.set_loglevel("warning")
+
 import os
-import sys
 
-sys.path.insert(0, os.path.abspath('../..'))
+import matplotlib.pyplot as plt
 
-RESOURCE_URL_HPC = "slurm://localhost"
+RESOURCE_URL_HPC = "ssh://localhost"
 WORKING_DIRECTORY = os.path.join(os.environ["HOME"], "work")
 
 pilot_compute_description_dask = {
@@ -20,7 +20,7 @@ pilot_compute_description_dask = {
     "walltime": 15,
     "project": "m4408",
     "number_of_nodes": 1,
-    "cores_per_node": 24,
+    "cores_per_node": 2,
     "scheduler_script_commands": ["#SBATCH --constraint=cpu"]
 }
 
@@ -31,12 +31,8 @@ def start_pilot():
     dp.wait()
     return dp
 
-
-
-
 dev_fock = qml.device("strawberryfields.fock", wires=2, cutoff_dim=10)
 dev_qubit = qml.device("default.qubit", wires=1)
-
 
 @qml.qnode(dev_fock)
 def photon_redirection(params):
@@ -75,7 +71,6 @@ def training(opt, init_params, cost, steps):
         cost_steps.append(cost(params))
     return params, training_steps, cost_steps
 
-
 def workflow(init_params, steps):
     opt = get_optimizer()
     params = get_init_params(init_params)
@@ -84,16 +79,29 @@ def workflow(init_params, steps):
 
 
 if __name__ == "__main__":
-    dask_pilot, dask_client = None, None
+    dask_pilot = None
 
     try:
         # Start Pilot
         dask_pilot = start_pilot()
 
-        # Get Dask client details
-        print(dask_pilot.get_details())
+        # Workflow
+        init_params = [0.01, 0.01]
+        params = get_init_params(init_params)
+        steps = 150
 
-        dask_pilot.run_sync_task(workflow, [0.01, 0.01], 50)
+        opt = dask_pilot.submit_task(get_optimizer)
+        t = dask_pilot.submit_task(training, opt, params, cost, steps)
+        opt_params, training_steps, cost_steps = t.result()
+
+        #Plot the results
+        fig, ax = plt.subplots(1, 1, figsize=(7, 5), facecolor="w")
+        ax.plot(training_steps, cost_steps)
+        ax.set_xlabel("Training steps")
+        ax.set_ylabel("Cost")
+        ax.set_title("Cost vs. Training steps")
+        plt.tight_layout()
+        plt.show()
     finally:
         if dask_pilot:
             dask_pilot.cancel()

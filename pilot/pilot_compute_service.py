@@ -1,10 +1,13 @@
 import logging
 import uuid
 
+from distributed import Future
+
 from pilot.plugins.dask import cluster as dask_cluster_manager
 from pilot.plugins.ray import cluster as ray_cluster_manager
 
 logging.basicConfig(level=logging.DEBUG)
+from pennylane import numpy as np
 
 
 class PilotComputeService:
@@ -61,23 +64,7 @@ class PilotComputeService:
 
         manager = self.__get_cluster_manager(framework_type, working_directory)
 
-        if framework_type.startswith("dask") or framework_type.startswith("ray"):
-            batch_job = manager.submit_job(pilot_compute_description)
-        else:
-            batch_job = manager.submit_job(
-                resource_url=resource_url,
-                number_of_nodes=number_of_nodes,
-                number_cores=number_cores,
-                cores_per_node=cores_per_node,
-                queue=queue,
-                walltime=wall_time,
-                project=project,
-                reservation=reservation,
-                config_name=config_name,
-                extend_job_id=parent,
-                pilot_compute_description=pilot_compute_description
-            )
-
+        batch_job = manager.submit_job(pilot_compute_description)
 
         details = manager.get_config_data()
         self.logger.info(f"Cluster details: {details}")
@@ -128,8 +115,16 @@ class PilotCompute(object):
         if self.saga_job:
             self.saga_job.cancel()
 
-    def submit(self, function_name):
-        self.cluster_manager.submit_compute_unit(function_name)
+    def submit_task(self, func, *args, **kwargs):
+        if not self.client:
+            self.client = self.get_client()
+
+        if self.client is None:
+            raise PilotAPIException("Cluster client isn't ready/provisioned yet")
+
+        print(f"Running qtask with args {args}, kwargs {kwargs}")
+        return self.client.submit(func, *args, **kwargs)
+        # return PilotFuture(future)
 
     def task(self, func):
         def wrapper(*args, **kwargs):
@@ -137,7 +132,7 @@ class PilotCompute(object):
 
         return wrapper
 
-    def run_sync_task(self, func, *args, **kwargs):
+    def run(self, func, *args, **kwargs):
         if not self.client:
             self.client = self.get_client()
 
@@ -166,3 +161,55 @@ class PilotCompute(object):
 
     def get_context(self, configuration=None):
         return self.cluster_manager.get_context(configuration)
+
+
+class PilotFuture:
+    def __init__(self, future: Future):
+        self._future = future
+
+    def result(self):
+        result = self._future.result()
+        type = self._future.type
+        if type is np.tensor:
+            return np.array(result, requires_grad=True)
+        else:
+            return result
+
+    def cancel(self):
+        self._future.cancel()
+
+    def done(self):
+        return self._future.done()
+
+    def exception(self):
+        return self._future.exception()
+
+    def add_done_callback(self, fn):
+        self._future.add_done_callback(fn)
+
+    def cancelled(self):
+        return self._future.cancelled()
+
+    def retry(self):
+        self._future.retry()
+
+    def release(self):
+        self._future.release()
+
+    def __repr__(self):
+        return f"PilotFuture({self._future})"
+
+    # Add additional methods or properties specific to your use case
+    def custom_method(self):
+        # Custom logic or functionality
+        pass
+
+
+def dask_submit(dask_pilot):
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            return dask_pilot.submit_task(func, *args, **kwargs)
+
+        return wrapper
+
+    return decorator
