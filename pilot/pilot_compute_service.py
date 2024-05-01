@@ -104,16 +104,15 @@ class PilotCompute(object):
     and be re-initialized.
     """
 
-    def __init__(self, saga_job=None, cluster_manager=None):
-        self.saga_job = saga_job
+    def __init__(self, batch_job=None, cluster_manager=None):
+        self.batch_job = batch_job
         self.cluster_manager = cluster_manager
         self.client = None
 
     def cancel(self):
         # self.cluster_manager.cancel()
-
-        if self.saga_job:
-            self.saga_job.cancel()
+        if self.batch_job:
+            self.batch_job.cancel()
 
     def submit_task(self, func, *args, **kwargs):
         if not self.client:
@@ -144,8 +143,11 @@ class PilotCompute(object):
         return wrapper_func(*args, **kwargs).result()
 
     def get_state(self):
-        if self.saga_job:
-            return self.saga_job.get_state()
+        """
+        Get the state of the PilotCompute.
+        """
+        if self.batch_job:
+            return self.batch_job.get_state()
 
     def get_id(self):
         return self.cluster_manager.get_jobid()
@@ -154,12 +156,19 @@ class PilotCompute(object):
         return self.cluster_manager.get_config_data()
 
     def get_client(self):
+        """
+        Returns the native client for interacting with the task execution engine (i.e. Dask or Ray) started via the Pilot-Job.
+        see also get_context()
+        """
         return self.cluster_manager.get_client()
 
     def wait(self):
         self.cluster_manager.wait()
 
     def get_context(self, configuration=None):
+        """
+        Returns the context for interacting with the task execution engine (i.e. Dask or Ray) started via the Pilot-Job.
+        """
         return self.cluster_manager.get_context(configuration)
 
 

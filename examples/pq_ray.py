@@ -14,8 +14,8 @@ pilot_compute_description_ray = {
     "working_directory": WORKING_DIRECTORY,
     "number_of_nodes": 1,
     "cores_per_node": 24,
-    "queue": "regular",
-    "walltime": 5,
+    "queue": "shared_interactive",
+    "walltime": 59,
     "type": "ray",
     "project": "m4408",
     "scheduler_script_commands": ["#SBATCH --constraint=cpu"]
@@ -48,6 +48,7 @@ def f(x):
 def start_pilot():
     pcs = PilotComputeService()
     dp = pcs.create_pilot(pilot_compute_description=pilot_compute_description_ray)
+    print("waiting for Ray pilot to start")
     dp.wait()
     return dp
 
@@ -60,19 +61,17 @@ if __name__ == "__main__":
     try:
         # Start Pilot
         ray_pilot = start_pilot()
-
-        print("waiting for Ray pilot to start")
-        ray_pilot.wait()
-
+        
         # Get Dask client details
-        ray_pilot = ray_pilot.get_context()
+        ray_client = ray_pilot.get_client()
         
         with ray_client:
             print(ray.get([f.remote(i) for i in range(10)]))
             print(ray.get([run_circuit.remote() for i in range(10)]))
     
         ray_pilot.cancel()
-        
+    except Exception as e:
+        print("An error occurred: %s" % (str(e)))
     finally:
         if ray_pilot:
             ray_pilot.cancel()
