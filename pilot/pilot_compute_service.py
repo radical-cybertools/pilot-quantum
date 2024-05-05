@@ -87,6 +87,17 @@ class PilotComputeService:
         self.logger.error(f"Invalid Pilot Compute Description: invalid type: {framework_type}")
         raise PilotAPIException(f"Invalid Pilot Compute Description: invalid type: {framework_type}")
 
+    def task(self, func):
+        """
+        Submit task to PilotComputeService, which can be scheduled on a group of pilots.
+        """
+        def wrapper(*args, **kwargs):
+            pass
+
+        return wrapper
+
+
+
 
 class PilotAPIException(Exception):
     pass
@@ -206,3 +217,5 @@ class PilotFuture:
     def custom_method(self):
         # Custom logic or functionality
         pass
+
+
