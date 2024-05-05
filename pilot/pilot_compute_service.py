@@ -3,10 +3,11 @@ import uuid
 
 from distributed import Future
 
+from pilot.pcs_logger import PilotComputeServiceLogger
 from pilot.plugins.dask import cluster as dask_cluster_manager
 from pilot.plugins.ray import cluster as ray_cluster_manager
+import os
 
-logging.basicConfig(level=logging.DEBUG)
 
 
 class PilotComputeService:
@@ -22,7 +23,7 @@ class PilotComputeService:
         Args:
         pjs_id (optional): Connect to an existing PilotComputeService.
         """
-        self.logger = logging.getLogger(__name__)
+        self.logger = PilotComputeServiceLogger()
         self.logger.info("PilotComputeService initialized.")
 
     def cancel(self):
