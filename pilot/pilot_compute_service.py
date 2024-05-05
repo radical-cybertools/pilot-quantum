@@ -7,7 +7,6 @@ from pilot.plugins.dask import cluster as dask_cluster_manager
 from pilot.plugins.ray import cluster as ray_cluster_manager
 
 logging.basicConfig(level=logging.DEBUG)
-from pennylane import numpy as np
 
 
 class PilotComputeService:
@@ -127,7 +126,7 @@ class PilotCompute(object):
 
     def task(self, func):
         def wrapper(*args, **kwargs):
-            return self.client.submit(func, *args, **kwargs)
+            return self.submit_task(func, *args, **kwargs)
 
         return wrapper
 
@@ -177,12 +176,7 @@ class PilotFuture:
         self._future = future
 
     def result(self):
-        result = self._future.result()
-        type = self._future.type
-        if type is np.tensor:
-            return np.array(result, requires_grad=True)
-        else:
-            return result
+        return self._future.result()
 
     def cancel(self):
         self._future.cancel()
@@ -212,13 +206,3 @@ class PilotFuture:
     def custom_method(self):
         # Custom logic or functionality
         pass
-
-
-def dask_submit(dask_pilot):
-    def decorator(func):
-        def wrapper(*args, **kwargs):
-            return dask_pilot.submit_task(func, *args, **kwargs)
-
-        return wrapper
-
-    return decorator
