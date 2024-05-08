@@ -48,7 +48,7 @@ class Manager:
             executable = "python"
             arguments = ["-m", "pilot.plugins.dask.bootstrap_dask", "-t", self.dask_worker_type]
             if "cores_per_node" in pilot_compute_description:
-                arguments.extend(["-p", self.pilot_compute_description["cores_per_node"]])
+                arguments.extend(["-p", str(self.pilot_compute_description["cores_per_node"])])
 
             self.logger.debug(f"Run {executable} Args: {arguments}")
         else:
@@ -116,11 +116,13 @@ class Manager:
                         try:
                             self.logger.info("init distributed client")
                             c = self.get_context()
-                            # c.scheduler_info()
-                            self.logger.info(str(c.scheduler_info()))
-                            c.close()
-
-                            return
+                            scheduler_info = c.scheduler_info()
+                            if len(scheduler_info.get('workers')) > 0:
+                                self.logger.info(str(c.scheduler_info()))
+                                c.close()
+                                return
+                            else:
+                                self.logger.info("Dask cluster is still initializing. Waiting...")
                         except IOError as e:
                             self.logger.warning("Dask Client Connect Attempt {} failed".format(i))
                             time.sleep(5)

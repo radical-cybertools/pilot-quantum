@@ -226,7 +226,7 @@ class DaskBootstrap():
             worker_command = f"dask cuda worker {master_url}"
 
         for node in self.nodes:
-            ssh_worker_command = f"ssh {node} {worker_command} --nthreads {self.cores_per_node} --memory-limit {self.dask_memory_limit}"
+            ssh_worker_command = f"ssh {node} {worker_command} --nthreads {self.cores_per_node}"
             subprocess.Popen(ssh_worker_command, shell=True)
             logging.debug(f"Dask worker started on {node} using {ssh_worker_command}")
 
