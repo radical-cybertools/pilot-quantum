@@ -61,18 +61,12 @@ class Job(object):
 
         if "working_directory" in self.job_description:
             self.working_directory = self.job_description["working_directory"]
-            self.logger.info("Working Directory: %s" % self.working_directory)
             try:
                 os.makedirs(self.working_directory, exist_ok=True)
             except:
                 pass
 
-        self.logger.info(f"**************working_directory {self.working_directory}, {self.job_description}")
-        # if pilot_compute_description == None:
-        #     self.pilot_compute_description = job_description
-        # else:
-        #     self.pilot_compute_description = pilot_compute_description
-        # self.host = urlparse(self.resource_url).netloc
+        self.logger.info(f"Working_directory {self.working_directory}, Job Description: {self.job_description}")
         self.host = urlparse(resource_url).hostname
         self.user = None
         if urlparse(resource_url).username is not None:
