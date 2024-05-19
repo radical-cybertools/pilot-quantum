@@ -123,6 +123,7 @@ class Manager:
                                 return
                             else:
                                 self.logger.info("Dask cluster is still initializing. Waiting...")
+                                time.sleep(5)
                         except IOError as e:
                             self.logger.warning("Dask Client Connect Attempt {} failed".format(i))
                             time.sleep(5)
