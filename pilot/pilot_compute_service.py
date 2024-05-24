@@ -132,7 +132,7 @@ class PilotCompute(object):
         if self.client is None:
             raise PilotAPIException("Cluster client isn't ready/provisioned yet")
 
-        print(f"Running qtask with args {args}, kwargs {kwargs}")
+        print(f"Running qtask {func} with args {args}, kwargs {kwargs}")
         return self.client.submit(func, *args, **kwargs)
         # return PilotFuture(future)
 
