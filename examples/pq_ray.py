@@ -14,8 +14,9 @@ pilot_compute_description_ray = {
     "working_directory": WORKING_DIRECTORY,
     "number_of_nodes": 1,
     "cores_per_node": 24,
-    "queue": "shared_interactive",
-    "walltime": 59,
+    #"queue": "shared_interactive",
+    "queue": "debug",
+    "walltime": 30,
     "type": "ray",
     "project": "m4408",
     "scheduler_script_commands": ["#SBATCH --constraint=cpu"]
@@ -54,7 +55,6 @@ def start_pilot():
 
 
 if __name__ == "__main__":
-
 
     ray_pilot, ray_client = None, None
 
