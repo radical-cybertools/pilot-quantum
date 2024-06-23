@@ -99,7 +99,7 @@ class Manager():
 
         return js, jd
 
-    # Ray 2.12.0
+    # Ray 2.30.0
     def submit_job(self,
                    pilot_compute_description=None
                    ):
@@ -145,7 +145,9 @@ class Manager():
                         except IOError as e:
                             print("Ray Client Connect Attempt {} failed".format(i))
                             time.sleep(5)
-            elif state == "Failed":
+            elif state.lower() == "queue":
+                pass
+            elif state.lower() == "failed" or state.lower() == "unknown":
                 break
             time.sleep(6)
 

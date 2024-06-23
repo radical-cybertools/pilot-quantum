@@ -1,9 +1,11 @@
 import os
+print("PYTHONPATH:", os.getenv('PYTHONPATH'))
+import sys
 import socket
 import time
 import pennylane as qml
-import pilot.pilot_compute_service
 import ray
+import pilot
 from pilot.pilot_compute_service import PilotComputeService
 
 RESOURCE_URL_HPC = "slurm://localhost"
@@ -19,6 +21,7 @@ pilot_compute_description_ray = {
     "walltime": 30,
     "type": "ray",
     "project": "m4408",
+    "conda_environment": "/pscratch/sd/l/luckow/conda/pilot-quantum",
     "scheduler_script_commands": ["#SBATCH --constraint=cpu"]
 }
 

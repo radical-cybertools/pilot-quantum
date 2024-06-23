@@ -63,6 +63,7 @@ class Manager:
 
         return js, jd
 
+
     def submit_job(self, pilot_compute_description):
         try:
             self.pilot_compute_description = pilot_compute_description

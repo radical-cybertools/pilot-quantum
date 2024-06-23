@@ -77,52 +77,17 @@ class Job(object):
             self.pilot_compute_description['queue'] = job_description['queue']
 
         logging.debug("Queue: %s"%self.pilot_compute_description['queue'])
-
-        if 'qos' in job_description:
-            self.pilot_compute_description['qos'] = job_description['qos']
-
-
-        if 'project' in job_description:
-            self.pilot_compute_description['project'] = job_description['project']
-
-        if 'reservation' in job_description:
-            self.pilot_compute_description['reservation'] = job_description['reservation']
-
-        self.pilot_compute_description['working_directory'] = os.getcwd()
-        if 'working_directory' in job_description:
-            self.pilot_compute_description['working_directory'] = job_description['working_directory']
-
-        self.pilot_compute_description['output'] = os.path.join(
-            self.pilot_compute_description['working_directory'],
-            "pq-%s.stdout"%self.job_uuid_short)
-
-        if 'output' in job_description:
-            self.pilot_compute_description['output'] = job_description['output']
-
-        if 'error' not in job_description:
-            self.pilot_compute_description['error'] = os.path.join(self.pilot_compute_description['working_directory'], "pq-%s.stderr"%self.job_uuid_short)
-
-        if 'error' in job_description:
-            self.pilot_compute_description['error'] = job_description['error']
-
-        if 'walltime' in job_description:
-            self.pilot_compute_description['walltime'] = job_description['walltime']
-
-
-        #if 'number_cores' in job_description:
-        #    self.pilot_compute_description['number_cores'] = job_description['number_cores']
-
-        self.pilot_compute_description['cores_per_node']=48
-        if 'cores_per_node' in job_description:
-            self.pilot_compute_description['cores_per_node'] = int(job_description['cores_per_node'])
-
+        
+        # Defaults
         self.pilot_compute_description['number_of_nodes'] = 1
-        if 'number_of_nodes' in job_description:
-            self.pilot_compute_description['number_of_nodes'] = int(job_description['number_of_nodes'])
+        self.pilot_compute_description['cores_per_node'] = 8
 
-        self.pilot_compute_description['number_cores']=self.pilot_compute_description['cores_per_node'] * self.pilot_compute_description['number_of_nodes']
+        self.pilot_compute_description.update(job_description)
+
+        self.pilot_compute_description['number_cores'] = self.pilot_compute_description['cores_per_node'] * self.pilot_compute_description['number_of_nodes']
 
         self.working_directory = self.pilot_compute_description["working_directory"]
+
         ### convert walltime in minutes to SLURM representation of time ###
         walltime_slurm = "01:00:00"
         if "walltime" in self.pilot_compute_description:
@@ -131,8 +96,54 @@ class Job(object):
             walltime_slurm = "" + str(hrs) + ":" + str(minu) + ":00"
         self.pilot_compute_description["walltime_slurm"]=walltime_slurm
 
-        self.pilot_compute_description["scheduler_script_commands"] = \
-            job_description.get("scheduler_script_commands", [])
+        self.pilot_compute_description['output'] = os.path.join(
+                                                    self.pilot_compute_description['working_directory'],
+                                                    "%s.stdout"%self.job_uuid_short)
+        self.pilot_compute_description['error'] = os.path.join(self.pilot_compute_description['working_directory'], "%s.stderr"%self.job_uuid_short)
+
+
+        # if 'qos' in job_description:
+        #     self.pilot_compute_description['qos'] = job_description['qos']
+
+
+        # if 'project' in job_description:
+        #     self.pilot_compute_description['project'] = job_description['project']
+
+        # if 'reservation' in job_description:
+        #     self.pilot_compute_description['reservation'] = job_description['reservation']
+
+        # self.pilot_compute_description['working_directory'] = os.getcwd()
+        # if 'working_directory' in job_description:
+        #     self.pilot_compute_description['working_directory'] = job_description['working_directory']
+
+        
+        # if 'output' in job_description:
+        #     self.pilot_compute_description['output'] = job_description['output']
+
+        # if 'error' not in job_description:
+        #     self.pilot_compute_description['error'] = os.path.join(self.pilot_compute_description['working_directory'], "pq-%s.stderr"%self.job_uuid_short)
+
+        # if 'error' in job_description:
+        #     self.pilot_compute_description['error'] = job_description['error']
+
+        # if 'walltime' in job_description:
+        #     self.pilot_compute_description['walltime'] = job_description['walltime']
+
+
+        # #if 'number_cores' in job_description:
+        # #    self.pilot_compute_description['number_cores'] = job_description['number_cores']
+
+        
+        # if 'cores_per_node' in job_description:
+        #     self.pilot_compute_description['cores_per_node'] = int(job_description['cores_per_node'])
+
+        
+        # if 'number_of_nodes' in job_description:
+        #     self.pilot_compute_description['number_of_nodes'] = int(job_description['number_of_nodes'])
+
+        
+        # self.pilot_compute_description["scheduler_script_commands"] = \
+        #     job_description.get("scheduler_script_commands", [])
 
 
        
@@ -172,6 +183,9 @@ class Job(object):
                 for sc in self.pilot_compute_description["scheduler_script_commands"]:
                     tmp.write("%s\n" % sc)
                 
+                if "conda_environment" in self.pilot_compute_description:
+                    tmp.write("conda activate %s\n"%self.pilot_compute_description["conda_environment"])
+
                 tmp.write("cd %s\n"%self.pilot_compute_description["working_directory"])
                 tmp.write("%s\n"%self.command)
                 

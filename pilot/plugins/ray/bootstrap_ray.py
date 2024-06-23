@@ -62,7 +62,7 @@ class RayBootstrap():
                                             self.job_id[:12] + "-" + self.job_timestamp + "_output.log"), "w")
         self.job_error = open(os.path.join(self.working_directory, 
                                             "pilot-agent-" +  
-                                            self.job_id[:12] + "-" + self.job_timestamp + "_output.log"), "w")
+                                            self.job_id[:12] + "-" + self.job_timestamp + "_error.log"), "w")
         self.ray_headnode_address = ""
         self.ray_process = None                
         self.cores_per_node=int(cores_per_node)
@@ -179,10 +179,10 @@ class RayBootstrap():
         
         self.ray_headnode_address = self.nodes[0]
         # TODO clean conda env
-        cmd = "conda activate pilot-quantum; ray stop; export RAY_ENABLE_WINDOWS_OR_OSX_CLUSTER=1; ray start --head   --dashboard-host=%s --num-cpus=0 --num-gpus=0 --ray-client-server-port=10001"%(self.ray_headnode_address)
+        cmd = "ray stop; export RAY_ENABLE_WINDOWS_OR_OSX_CLUSTER=1; ray start --head   --dashboard-host=%s --num-cpus=0 --num-gpus=0 --ray-client-server-port=10001"%(self.ray_headnode_address)
         print("Start Ray Head Node with command: %s"%(cmd))
         result=execute_ssh_command(host=self.ray_headnode_address, 
-                                   user=getpass.getuser(),              command=cmd, arguments=None,
+                                   user=getpass.getuser(), command=cmd, arguments=None,
                                    working_directory=self.working_directory,
                                    job_output=self.job_output, job_error=self.job_error)
 
@@ -204,8 +204,7 @@ class RayBootstrap():
 
         #ray.shutdown()
         #time.sleep(5)
-        
-        
+                
         print("Ray started.")
 
 
@@ -321,6 +320,13 @@ if __name__ == "__main__" :
     ray_config_filename = "ray_config_" + run_timestamp
     performance_trace_file = open(os.path.join(working_directory,   
                                                performance_trace_filename), "a")
+
+
+    # print conda environment script is running in
+    print("Conda Environment: %s"%(os.environ["CONDA_DEFAULT_ENV"]))
+    # print python interpreter path
+    print("Python Interpreter: %s"%(sys.executable))
+
     start = time.time()
     #performance_trace_file.write("start_time, %.5f"%(time.time()))
  
@@ -337,9 +343,7 @@ if __name__ == "__main__" :
         ray_cluster.shutdown()
         if options.clean:
             pass
-            # directory = "/tmp/zookeeper/"
-            # logging.debug("delete: " + directory)
-            # shutil.rmtree(directory)
+            
         sys.exit(0)
     
     print("Finished launching of Ray Cluster - Sleeping now")
