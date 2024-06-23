@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import datetime
-import logging
 import os
 import subprocess
 import sys
@@ -10,9 +9,7 @@ import traceback
 import uuid
 from urllib.parse import urlparse
 
-logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
-logger = logging.getLogger()
-logger.setLevel(logging.DEBUG)
+from pilot.pcs_logger import PilotComputeServiceLogger
 
 
 class State:
@@ -36,6 +33,7 @@ class Service(object):
         """Constructor"""
         self.resource_url = resource_url
         self.pilot_compute_description = pilot_compute_description
+        self.logger = PilotComputeServiceLogger()
 
     def create_job(self, job_description):
         if "pilot_compute_description" in job_description:
@@ -54,6 +52,7 @@ class Job(object):
 
     def __init__(self, job_description, resource_url, pilot_compute_description):
         self.resource_url = resource_url
+        self.logger = PilotComputeServiceLogger()
 
         self.job_description = job_description
         self.pilot_compute_description = job_description
@@ -62,23 +61,17 @@ class Job(object):
 
         if "working_directory" in self.job_description:
             self.working_directory = self.job_description["working_directory"]
-            print("Working Directory: %s" % self.working_directory)
             try:
                 os.makedirs(self.working_directory, exist_ok=True)
             except:
                 pass
 
-        print(f"**************working_directory {self.working_directory}, {self.job_description}")
-        # if pilot_compute_description == None:
-        #     self.pilot_compute_description = job_description
-        # else:
-        #     self.pilot_compute_description = pilot_compute_description
-        # self.host = urlparse(self.resource_url).netloc
+        self.logger.info(f"Working_directory {self.working_directory}, Job Description: {self.job_description}")
         self.host = urlparse(resource_url).hostname
         self.user = None
         if urlparse(resource_url).username is not None:
             self.user = urlparse(resource_url).username
-        logger.debug("URL: " + str(self.resource_url) + " Host: " + self.host)
+        self.logger.debug("URL: " + str(self.resource_url) + " Host: " + self.host)
         self.id = "pilot-quantum-ssh" + str(uuid.uuid1())
         self.job_id = self.id
         self.job_timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -106,14 +99,14 @@ class Job(object):
                     break
             except:
                 exc_type, exc_value, exc_traceback = sys.exc_info()
-                logger.warning("Submission failed: " + str(exc_value))
+                self.logger.warning("Submission failed: " + str(exc_value))
                 # self.__print_traceback()
                 trials = trials + 1
                 time.sleep(3)
                 if trials == TRIAL_MAX:
                     raise Exception("Submission of agent failed.")
 
-        logger.debug("Job State : %s" % (self.get_state()))
+        self.logger.debug("Job State : %s" % (self.get_state()))
         self.run_command()
 
 
@@ -127,7 +120,7 @@ class Job(object):
             args.extend(["ssh", "-l", self.user, self.host, "/bin/date"])
             
         
-        logger.debug("Execute: " + str(args))
+        self.logger.debug("Execute: " + str(args))
         subprocess_handle = subprocess.Popen(args=args,
                                              stdout=self.job_output,
                                              stderr=self.job_error,
@@ -135,9 +128,9 @@ class Job(object):
                                              shell=False)
         running = False
         if subprocess_handle.poll() is not None and subprocess_handle.poll() != 0:
-            logger.warning("Submission failed.")
+            self.logger.warning("Submission failed.")
         else:
-            logger.debug("Test Job succeeded")
+            self.logger.debug("Test Job succeeded")
             running = True
         subprocess_handle.kill()
         return running
@@ -166,7 +159,7 @@ class Job(object):
             #         elif rc == 0:
             #             result = State.DONE
         except:
-            logger.warning("Instance not reachable/active yet...")
+            self.logger.warning("Instance not reachable/active yet...")
 
     def cancel(self):
         if self.ssh_process != None: self.ssh_process.terminate()
@@ -201,7 +194,7 @@ class Job(object):
                        str(self.pilot_compute_description["executable"]),
                        " ".join(self.pilot_compute_description["arguments"]))
 
-        print("Execute SSH Command: {0}".format(command))
+        self.logger.info("Execute SSH Command: {0}".format(command))
         # status = subprocess.call(command, shell=True)
         for i in range(3):
             self.ssh_process = subprocess.Popen(command, shell=True,
@@ -217,9 +210,9 @@ class Job(object):
     # private methods
     def __print_traceback(self):
         exc_type, exc_value, exc_traceback = sys.exc_info()
-        print("*** print_tb:")
+        self.logger.error("*** print_tb:")
         traceback.print_tb(exc_traceback, limit=1, file=sys.stdout)
-        print("*** print_exception:")
+        self.logger.error("*** print_exception:")
         traceback.print_exception(exc_type, exc_value, exc_traceback,
                                   limit=2, file=sys.stdout)
 

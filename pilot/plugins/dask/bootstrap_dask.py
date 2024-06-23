@@ -50,9 +50,7 @@ class DaskBootstrap():
         self.dask_process = None
         self.extension_job_id = extension_job_id
         self.cores_per_node = cores_per_node
-        self.ssh_key = "~/.ssh/mykey"  # perlmutter - TODO: Should make it as input parameter from the pilot job description.
-        self.dask_ssh = "dask-ssh --ssh-private-key %s" % self.ssh_key
-        # self.dask_ssh = "dask-ssh"
+        self.dask_ssh = "dask-ssh"
         self.dask_memory_limit = 92e9  # Stampede
         self.worker_type = worker_type
         # self.dask_memory_limit=110e9 #Wrangler
@@ -228,7 +226,7 @@ class DaskBootstrap():
             worker_command = f"dask cuda worker {master_url}"
 
         for node in self.nodes:
-            ssh_worker_command = f"ssh {node} {worker_command} "
+            ssh_worker_command = f"ssh {node} {worker_command} --nthreads {self.cores_per_node}"
             subprocess.Popen(ssh_worker_command, shell=True)
             logging.debug(f"Dask worker started on {node} using {ssh_worker_command}")
 

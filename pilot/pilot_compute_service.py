@@ -1,13 +1,16 @@
+import csv
 import logging
+import time
 import uuid
 
 from distributed import Future
 
+from pilot.pcs_logger import PilotComputeServiceLogger
 from pilot.plugins.dask import cluster as dask_cluster_manager
 from pilot.plugins.ray import cluster as ray_cluster_manager
-
-logging.basicConfig(level=logging.DEBUG)
-from pennylane import numpy as np
+import os
+from dask.distributed import wait
+from datetime import datetime
 
 
 class PilotComputeService:
@@ -23,7 +26,7 @@ class PilotComputeService:
         Args:
         pjs_id (optional): Connect to an existing PilotComputeService.
         """
-        self.logger = logging.getLogger(__name__)
+        self.logger = PilotComputeServiceLogger()        
         self.logger.info("PilotComputeService initialized.")
 
     def cancel(self):
@@ -45,18 +48,8 @@ class PilotComputeService:
         :return: Initialized PilotCompute instance.
         """
         self.logger.info("Creating a new PilotCompute.")
-        resource_url = pilot_compute_description.get("resource", "")
         working_directory = pilot_compute_description.get("working_directory", "/tmp")
-        project = pilot_compute_description.get("project")
-        reservation = pilot_compute_description.get("reservation")
-        queue = pilot_compute_description.get("queue")
-        wall_time = pilot_compute_description.get("wall_time", 10)
-        number_cores = int(pilot_compute_description.get("number_cores", 1))
-        number_of_nodes = int(pilot_compute_description.get("number_of_nodes", 1))
-        cores_per_node = int(pilot_compute_description.get("cores_per_node", 1))
-        config_name = pilot_compute_description.get("config_name", "default")
-        parent = pilot_compute_description.get("parent")
-
+        
         framework_type = pilot_compute_description.get("type")
         if framework_type is None:
             self.logger.error("Invalid Pilot Compute Description: type not specified")
@@ -65,11 +58,17 @@ class PilotComputeService:
         manager = self.__get_cluster_manager(framework_type, working_directory)
 
         batch_job = manager.submit_job(pilot_compute_description)
+        self.pilot_id = batch_job.get_id()
+
+        self.metrics_file_name = os.path.join(working_directory, f"{self.pilot_id}-metrics.csv")
+
 
         details = manager.get_config_data()
         self.logger.info(f"Cluster details: {details}")
-        pilot = PilotCompute(batch_job, cluster_manager=manager)
+        pilot = PilotCompute(self.metrics_file_name, batch_job, cluster_manager=manager)
         return pilot
+    
+
 
     def __get_cluster_manager(self, framework_type, working_directory):
         """
@@ -88,6 +87,17 @@ class PilotComputeService:
         self.logger.error(f"Invalid Pilot Compute Description: invalid type: {framework_type}")
         raise PilotAPIException(f"Invalid Pilot Compute Description: invalid type: {framework_type}")
 
+    def task(self, func):
+        """
+        Submit task to PilotComputeService, which can be scheduled on a group of pilots.
+        """
+        def wrapper(*args, **kwargs):
+            pass
+
+        return wrapper
+
+
+
 
 class PilotAPIException(Exception):
     pass
@@ -104,30 +114,72 @@ class PilotCompute(object):
     and be re-initialized.
     """
 
-    def __init__(self, batch_job=None, cluster_manager=None):
+    def __init__(self, metrics_file_name, batch_job=None, cluster_manager=None):
         self.batch_job = batch_job
         self.cluster_manager = cluster_manager
         self.client = None
+        self.metrics_fn = metrics_file_name
+
 
     def cancel(self):
-        # self.cluster_manager.cancel()
+        if self.client:
+            self.client.close()
         if self.batch_job:
             self.batch_job.cancel()
 
-    def submit_task(self, func, *args, **kwargs):
+    def submit_task(self, task_name, func, *args, **kwargs):
         if not self.client:
             self.client = self.get_client()
 
         if self.client is None:
             raise PilotAPIException("Cluster client isn't ready/provisioned yet")
 
-        print(f"Running qtask with args {args}, kwargs {kwargs}")
-        return self.client.submit(func, *args, **kwargs)
-        # return PilotFuture(future)
+        print(f"Running task {task_name} with details func:{func.__name__};args {args};kwargs {kwargs}")
+
+
+        metrics = {
+            'task_id': task_name,
+            'submit_time': datetime.now(),
+            'wait_time_secs': None, 
+            'completion_time': None,            
+            'execution_ms': None,
+            'status': None,
+            'error_msg': None,
+        }
+
+        def task_func(metrics_fn, *args, **kwargs):
+            metrics["wait_time_secs"] = (datetime.now()-metrics["submit_time"]).total_seconds()
+            
+            task_execution_start_time = time.time()
+            try:
+                result = func(*args, **kwargs)
+                metrics["status"] = "SUCCESS"
+            except Exception as e:
+                metrics["status"] = "FAILED"
+                metrics["error_msg"] = str(e)
+                
+
+            metrics["completion_time"] = datetime.now()
+            metrics["execution_ms"] = time.time() - task_execution_start_time
+
+            with open(metrics_fn, 'a', newline='') as csvfile:
+                fieldnames = ['task_id', 'submit_time', 'wait_time_secs', 'completion_time', 'execution_ms', 'status', 'error_msg']
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+
+                if csvfile.tell() == 0:
+                    writer.writeheader()
+
+                writer.writerow(metrics)
+
+            return result             
+
+        task_future = self.client.submit(task_func, self.metrics_fn, *args, **kwargs)
+
+        return task_future
 
     def task(self, func):
         def wrapper(*args, **kwargs):
-            return self.client.submit(func, *args, **kwargs)
+            return self.submit_task(func, *args, **kwargs)
 
         return wrapper
 
@@ -165,6 +217,10 @@ class PilotCompute(object):
     def wait(self):
         self.cluster_manager.wait()
 
+    def wait_tasks(self, tasks):
+        wait(tasks)
+        
+
     def get_context(self, configuration=None):
         """
         Returns the context for interacting with the task execution engine (i.e. Dask or Ray) started via the Pilot-Job.
@@ -177,12 +233,7 @@ class PilotFuture:
         self._future = future
 
     def result(self):
-        result = self._future.result()
-        type = self._future.type
-        if type is np.tensor:
-            return np.array(result, requires_grad=True)
-        else:
-            return result
+        return self._future.result()
 
     def cancel(self):
         self._future.cancel()
@@ -214,11 +265,3 @@ class PilotFuture:
         pass
 
 
-def dask_submit(dask_pilot):
-    def decorator(func):
-        def wrapper(*args, **kwargs):
-            return dask_pilot.submit_task(func, *args, **kwargs)
-
-        return wrapper
-
-    return decorator

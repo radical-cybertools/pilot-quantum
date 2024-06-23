@@ -6,8 +6,8 @@ import pilot.pilot_compute_service
 import ray
 from pilot.pilot_compute_service import PilotComputeService
 
-RESOURCE_URL_HPC = "slurm://localhost"
-WORKING_DIRECTORY = os.path.join(os.environ["PSCRATCH"], "work")
+RESOURCE_URL_HPC = "ssh://localhost"
+WORKING_DIRECTORY = os.path.join(os.environ["HOME"], "work")
 
 pilot_compute_description_ray = {
     "resource": RESOURCE_URL_HPC,

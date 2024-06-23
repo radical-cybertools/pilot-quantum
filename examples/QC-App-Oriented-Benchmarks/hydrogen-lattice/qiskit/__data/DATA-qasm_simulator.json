@@ -1,0 +1,74 @@
+{
+  "Benchmark Results - Hydrogen Lattice (1) - Qiskit": {
+    "backend_id": "qasm_simulator",
+    "circuit_metrics": null,
+    "end_time": 1717343258.409556,
+    "group_metrics": {
+      "avg_create_times": [
+        0.003
+      ],
+      "avg_depths": [
+        32.0
+      ],
+      "avg_elapsed_times": [
+        0.064
+      ],
+      "avg_exec_creating_times": [
+        0.001
+      ],
+      "avg_exec_running_times": [
+        0.001
+      ],
+      "avg_exec_times": [
+        0.004
+      ],
+      "avg_exec_validating_times": [
+        0.001
+      ],
+      "avg_fidelities": [
+        0.81
+      ],
+      "avg_hf_fidelities": [
+        0.813
+      ],
+      "avg_tr_depths": [
+        20.0
+      ],
+      "avg_tr_n2qs": [
+        18.0
+      ],
+      "avg_tr_xis": [
+        0.316
+      ],
+      "avg_xis": [
+        0.194
+      ],
+      "groups": [
+        "6"
+      ],
+      "job_ids": [
+        [
+          "857d4bef-9f06-4276-b75d-324a98cc54de",
+          "7d75b1fc-29bd-4728-85b0-3afc259fdf22",
+          "6c90761a-677e-4106-80d9-6a8d8150c8cb"
+        ]
+      ],
+      "std_create_times": [
+        0.0
+      ],
+      "std_elapsed_times": [
+        0.02
+      ],
+      "std_exec_times": [
+        0.0
+      ],
+      "std_fidelities": [
+        0.006
+      ],
+      "std_hf_fidelities": [
+        0.005
+      ]
+    },
+    "start_time": 1717343258.213106
+  }
+}
