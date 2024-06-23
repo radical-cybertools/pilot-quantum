@@ -122,7 +122,8 @@ class PilotCompute(object):
 
 
     def cancel(self):
-        # self.cluster_manager.cancel()
+        if self.client:
+            self.client.close()
         if self.batch_job:
             self.batch_job.cancel()
 
@@ -141,20 +142,28 @@ class PilotCompute(object):
             'submit_time': datetime.now(),
             'wait_time_secs': None, 
             'completion_time': None,            
-            'execution_ms': None
+            'execution_ms': None,
+            'status': None,
+            'error_msg': None,
         }
 
         def task_func(metrics_fn, *args, **kwargs):
             metrics["wait_time_secs"] = (datetime.now()-metrics["submit_time"]).total_seconds()
             
             task_execution_start_time = time.time()
-            result = func(*args, **kwargs)
+            try:
+                result = func(*args, **kwargs)
+                metrics["status"] = "SUCCESS"
+            except Exception as e:
+                metrics["status"] = "FAILED"
+                metrics["error_msg"] = str(e)
+                
 
             metrics["completion_time"] = datetime.now()
             metrics["execution_ms"] = time.time() - task_execution_start_time
 
             with open(metrics_fn, 'a', newline='') as csvfile:
-                fieldnames = ['task_id', 'submit_time', 'wait_time_secs', 'completion_time', 'execution_ms']
+                fieldnames = ['task_id', 'submit_time', 'wait_time_secs', 'completion_time', 'execution_ms', 'status', 'error_msg']
                 writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
 
                 if csvfile.tell() == 0:
