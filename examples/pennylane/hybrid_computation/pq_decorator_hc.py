@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import pennylane as qml
 from pennylane import numpy as np
 
-from pilot.pilot_compute_service import PilotComputeService, dask_submit
+import pilot.pilot_compute_service as pcs
 
 plt.set_loglevel("warning")
 
@@ -27,8 +27,8 @@ pilot_compute_description_dask = {
 
 
 def start_pilot():
-    pcs = PilotComputeService()
-    dp = pcs.create_pilot(pilot_compute_description=pilot_compute_description_dask)
+    p = pcs.PilotComputeService()
+    dp = p.create_pilot(pilot_compute_description=pilot_compute_description_dask)
     dp.wait()
     return dp
 
@@ -61,14 +61,17 @@ def cost(params, phi1=0.4, phi2=0.8):
     photon_result = photon_redirection(params)
     return squared_difference(qubit_result, photon_result)
 
+
 def get_init_params(init_params):
     return np.array(init_params, requires_grad=True)
 
-@dask_submit(dask_pilot)
+
+@dask_pilot.task
 def get_optimizer():
     return qml.GradientDescentOptimizer(stepsize=0.4)
 
-@dask_submit(dask_pilot)
+
+@dask_pilot.task
 def training(opt, init_params, cost, steps):
     params = init_params
     training_steps, cost_steps = [], []  # to record the costs as training progresses

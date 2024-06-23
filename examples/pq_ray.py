@@ -9,14 +9,15 @@ import pilot
 from pilot.pilot_compute_service import PilotComputeService
 
 RESOURCE_URL_HPC = "slurm://localhost"
+#WORKING_DIRECTORY = os.path.join(os.environ["HOME"], "work")
 WORKING_DIRECTORY = os.path.join(os.environ["PSCRATCH"], "work")
 
-pilot_compute_description_ray = {
+pilot_compute_description_ray_cpu = {
     "resource": RESOURCE_URL_HPC,
     "working_directory": WORKING_DIRECTORY,
     "number_of_nodes": 1,
     "cores_per_node": 24,
-    #"queue": "shared_interactive",
+    "gpus_per_node": 0,
     "queue": "debug",
     "walltime": 30,
     "type": "ray",
@@ -24,6 +25,22 @@ pilot_compute_description_ray = {
     "conda_environment": "/pscratch/sd/l/luckow/conda/pilot-quantum",
     "scheduler_script_commands": ["#SBATCH --constraint=cpu"]
 }
+
+pilot_compute_description_ray_gpu = {
+    "resource": RESOURCE_URL_HPC,
+    "working_directory": WORKING_DIRECTORY,
+    "number_of_nodes": 1,
+    "cores_per_node": 24,
+    "gpus_per_node": 4,
+    #"queue": "shared_interactive",
+    "queue": "debug",
+    "walltime": 30,
+    "type": "ray",
+    "project": "m4408",
+    "conda_environment": "/pscratch/sd/l/luckow/conda/pilot-quantum",
+    "scheduler_script_commands": ["#SBATCH --constraint=gpu"]
+}
+
 
 @ray.remote
 def run_circuit():
@@ -49,9 +66,9 @@ def f(x):
     return x * x    
 
 
-def start_pilot():
+def start_pilot(pilot_compute_description):
     pcs = PilotComputeService()
-    dp = pcs.create_pilot(pilot_compute_description=pilot_compute_description_ray)
+    dp = pcs.create_pilot(pilot_compute_description=pilot_compute_description)
     print("waiting for Ray pilot to start")
     dp.wait()
     return dp
@@ -63,7 +80,7 @@ if __name__ == "__main__":
 
     try:
         # Start Pilot
-        ray_pilot = start_pilot()
+        ray_pilot = start_pilot(pilot_compute_description_ray_gpu)
         
         # Get Dask client details
         ray_client = ray_pilot.get_client()

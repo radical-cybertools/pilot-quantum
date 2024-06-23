@@ -25,6 +25,7 @@ from urllib.parse import urlparse
 
 from pilot.util.ssh_utils import execute_ssh_command, execute_ssh_command_as_daemon
 
+
 class Manager():
 
     def __init__(self, 
@@ -46,13 +47,14 @@ class Manager():
         self.local_id = None  # Local Resource Manager ID (e.g. SLURM id)
         self.ray_process = None
         self.ray_cluster = None
-        self.job_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.job_output = open(os.path.join(self.working_directory, 
-                                            self.job_timestamp + "_ray_pilot_agent_output.log"), "w")
-        self.job_error = open(os.path.join(self.working_directory, 
-                                           self.job_timestamp + "_ray_pilot_agent_error.log"), "w")
-
         self.ray_client = None # Ray Client
+        self.job_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        # self.job_output = open(os.path.join(self.working_directory, 
+        #                                     self.job_timestamp + "_ray_pilot_agent_output.log"), "w")
+        # self.job_error = open(os.path.join(self.working_directory, 
+        #                                    self.job_timestamp + "_ray_pilot_agent_error.log"), "w")
+        
         try:
             os.makedirs(self.working_directory)
         except:

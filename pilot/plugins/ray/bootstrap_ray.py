@@ -178,8 +178,19 @@ class RayBootstrap():
         #                       dashboard_host=self.nodes[0], num_cpus=0, num_gpus=0)
         
         self.ray_headnode_address = self.nodes[0]
-        # TODO clean conda env
-        cmd = "ray stop; export RAY_ENABLE_WINDOWS_OR_OSX_CLUSTER=1; ray start --head   --dashboard-host=%s --num-cpus=0 --num-gpus=0 --ray-client-server-port=10001"%(self.ray_headnode_address)
+        
+        conda_env = os.environ["CONDA_DEFAULT_ENV"]
+        if conda_env is not None or conda_env!="":
+            cmd = """conda activate %s; \
+                    ray stop; \
+                    export RAY_ENABLE_WINDOWS_OR_OSX_CLUSTER=1; \
+                    ray start --head  --dashboard-host=%s --num-cpus=0 --num-gpus=0 --ray-client-server-port=10001"""%(conda_env, 
+                                                                                                                        self.ray_headnode_address)
+        else:
+            cmd = """ray stop; \
+                    export RAY_ENABLE_WINDOWS_OR_OSX_CLUSTER=1; \
+                    ray start --head  --dashboard-host=%s --num-cpus=0 --num-gpus=0 --ray-client-server-port=10001"""%(self.ray_headnode_address)
+        
         print("Start Ray Head Node with command: %s"%(cmd))
         result=execute_ssh_command(host=self.ray_headnode_address, 
                                    user=getpass.getuser(), command=cmd, arguments=None,
@@ -188,14 +199,21 @@ class RayBootstrap():
 
         ray_client = ray.init()
         self.ray_headnode_address = ray_client.address_info["address"] # update if ray was bound to a different ip
-        print("Ray Head Node started at {}. Start workers now".format(ray_client.address_info))
+        print("Ray Head Node started at {}. Start workers now".format(self.ray_headnode_address))
         
         with open(os.path.join(self.working_directory, "ray_scheduler"), "w") as master_file:
             master_file.write(self.ray_headnode_address)
 
         for i in self.nodes:
             #execute_ssh_command(i, "killall -9 ray")
-            command = "export RAY_ENABLE_WINDOWS_OR_OSX_CLUSTER=1; ray start --address %s --num-cpus=%d --num-gpus=%d"%(self.ray_headnode_address , self.cores_per_node, self.gpu_per_nodes)
+            
+            if conda_env is not None or conda_env!="":
+                command = """conda activate %s; \
+                        export RAY_ENABLE_WINDOWS_OR_OSX_CLUSTER=1; 
+                        ray start --address %s --num-cpus=%d --num-gpus=%d"""%(conda_env, self.ray_headnode_address , self.cores_per_node, self.gpu_per_nodes)
+            else:
+                command = """export RAY_ENABLE_WINDOWS_OR_OSX_CLUSTER=1; 
+                        ray start --address %s --num-cpus=%d --num-gpus=%d"""%(self.ray_headnode_address , self.cores_per_node, self.gpu_per_nodes)
             
             result=execute_ssh_command(host=i, 
                                        user=getpass.getuser(),              command=command, arguments=None,
