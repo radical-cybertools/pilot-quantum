@@ -2,6 +2,7 @@ import os
 
 import pennylane as qml
 from pilot.pilot_compute_service import PilotComputeService
+from time import sleep
 
 RESOURCE_URL_HPC = "ssh://localhost"
 WORKING_DIRECTORY = os.path.join(os.environ["HOME"], "work")
@@ -9,13 +10,9 @@ WORKING_DIRECTORY = os.path.join(os.environ["HOME"], "work")
 pilot_compute_description_dask = {
     "resource": RESOURCE_URL_HPC,
     "working_directory": WORKING_DIRECTORY,
-    "queue": "regular",
     "type": "dask",
-    "walltime": 5,
-    "project": "m4408",
-    "number_of_nodes": 1,
-    "cores_per_node": 2,
-    "scheduler_script_commands": ["#SBATCH --constraint=cpu"]
+    "number_of_nodes": 10,
+    "cores_per_node": 10,
 }
 
 
@@ -56,19 +53,22 @@ if __name__ == "__main__":
         dask_pilot = start_pilot()
 
         # Get Dask client details
-
-        a = dask_pilot.submit_task(square, 20)
-        b = dask_pilot.submit_task(add, a, 40)
-        print(f"{b.result()}\n")
-
         dask_client = dask_pilot.get_client()
         print(dask_client.scheduler_info())
 
-        # Execute Classical tasks
-        print(dask_client.gather(dask_client.map(square, range(10))))
+        tasks = []
+        for i in range(1000):
+            k = dask_pilot.submit_task(f"task_square-{i}",sleep, 3)
+            tasks.append(k)
 
-        # Execute Quantum tasks
-        print(dask_client.gather(dask_client.map(lambda a: pennylane_quantum_circuit(), range(10))))
+        dask_pilot.wait_tasks(tasks)
+
+
+        # # Execute Classical tasks
+        # print(dask_client.gather(dask_client.map(square, range(10))))
+
+        # # Execute Quantum tasks
+        # print(dask_client.gather(dask_client.map(lambda a: pennylane_quantum_circuit(), range(10))))
 
     finally:
         if dask_pilot:

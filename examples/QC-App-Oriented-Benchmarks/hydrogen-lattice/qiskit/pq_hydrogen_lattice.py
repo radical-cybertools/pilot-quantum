@@ -60,7 +60,7 @@ except Exception as e:
     pass
 
 
-RESOURCE_URL_HPC = "slurm://localhost"
+RESOURCE_URL_HPC = "ssh://localhost"
 WORKING_DIRECTORY = os.path.join(os.environ["HOME"], "work")
 
 pilot_compute_description_dask = {
@@ -83,7 +83,7 @@ def start_pilot():
     return dp
 
 
-dask_pilot = start_pilot()
+# dask_pilot = start_pilot()
 
 
 # Benchmark Name
@@ -1080,9 +1080,9 @@ def plot_results_from_data(
 ################################################
 # RUN METHOD
 
-MAX_QUBITS = 16
+MAX_QUBITS = 6
 def run(
-    min_qubits=16, max_qubits=16, skip_qubits=2, max_circuits=3, num_shots=100,
+    min_qubits=MAX_QUBITS, max_qubits=MAX_QUBITS, skip_qubits=2, max_circuits=3, num_shots=100,
     method=1,
     radius=None,
     thetas_array=None,
@@ -1873,15 +1873,22 @@ def submit_to_estimator(qc=None, num_qubits=1, unique_id=-1, parameterized=False
 #################################
 # MAIN
 
+def square(x):
+    return x * x
+
 # # if main, execute method
 if __name__ == "__main__":
     try:
-        k = dask_pilot.submit_task(run)
-        import pdb
-        pdb.set_trace()
-        print(k)
+        from dask.distributed import Client, LocalCluster
+        cluster = LocalCluster(n_workers=2, processes=True)
+        client = Client(cluster)
+        k = client.submit(run)
         k.result()
+        # k = dask_pilot.submit_task(run)
+        print("Computation done....")
+        cluster.shutdown()
+
     except Exception as e:
         print(e)
-        if dask_pilot:
-            dask_pilot.cancel()
+        # if dask_pilot:
+        #     dask_pilot.cancel()

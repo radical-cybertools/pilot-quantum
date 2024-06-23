@@ -1051,10 +1051,10 @@ def plot_results_from_data(
 ################################################
 # RUN METHOD
 
-MAX_QUBITS = 16
+MAX_QUBITS = 8
 
 def run(
-    min_qubits=2, max_qubits=16, skip_qubits=2, max_circuits=3, num_shots=10000,
+    min_qubits=2, max_qubits=8, skip_qubits=2, max_circuits=3, num_shots=10000,
     method=1,
     radius=None,
     thetas_array=None,

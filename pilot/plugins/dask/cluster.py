@@ -90,7 +90,8 @@ class Manager:
         self.nodes = self.job.get_nodes_list()
         self.host = self.nodes[0]  # first node is master host - requires public ip to connect to
 
-        worker_options = {"nthreads": self.pilot_compute_description.get("cores_per_node", 1), "n_workers": 1,
+        worker_options = {"nthreads": self.pilot_compute_description.get("cores_per_node", 1), 
+                          "n_workers": self.pilot_compute_description.get("number_of_nodes", 1),
                           "memory_limit": '3GB'}
         hosts = list(np.append(self.nodes[0], self.nodes))
         self.dask_cluster = SSHCluster(hosts,
