@@ -8,7 +8,7 @@ Pilot-Quantum is presented as a Quantum-HPC middleware framework designed to add
  
 Requirements:
 
-	* SLURM/PBS/Torque cluster
+	* Currently only SLURM clusters are supported
 	* Setup password-less documentation, e.g., using sshproxy on Perlmutter.
 
 Anaconda or Miniconda is the preferred distribution
