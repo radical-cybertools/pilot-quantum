@@ -28,4 +28,4 @@ To install Pilot-Quantum type:
 
 ## Hints
 
-Your default conda environment should contain all Pilot-Quantum and application dependencies. Activate it, e.g., in the `.bashrc`.oxy
+Your default conda environment should contain all Pilot-Quantum and application dependencies. Activate it, e.g., in the `.bashrc`
