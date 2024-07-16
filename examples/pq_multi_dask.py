@@ -51,11 +51,11 @@ if __name__ == "__main__":
         # Submit tasks to pcs
         tasks = []
         for i in range(1000):
-            k = pcs.submit_task(f"task_pennylane-{i}", pennylane_quantum_circuit)
+            k = pcs.submit_task(pennylane_quantum_circuit, task_name = f"task_pennylane-{i}" )
             tasks.append(k)
 
         for i in range(1000):
-            k = pcs.submit_task(f"task_pennylane-{i}", pennylane_quantum_circuit, pilot=pilots[0])
+            k = pcs.submit_task(pennylane_quantum_circuit, task_name = f"task_pennylane-{i}", pilot=pilots[0])
             tasks.append(k)
 
 

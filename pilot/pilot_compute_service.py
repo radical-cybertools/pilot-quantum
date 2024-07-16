@@ -137,7 +137,7 @@ class PilotComputeService:
         """
         return self.cluster_manager.get_client()
 
-    def submit_task(self, task_name, func, *args, **kwargs):
+    def submit_task(self, func, *args, **kwargs):
         pilot_scheduled = 'ANY'
 
         if kwargs.get("pilot"):
@@ -145,6 +145,11 @@ class PilotComputeService:
                 raise PilotAPIException(f"Pilot {kwargs['pilot']} not found")
             pilot_scheduled = kwargs["pilot"]
             del kwargs["pilot"]
+
+        task_name = kwargs.get("task_name", f"task-{uuid.uuid4()}")
+        if kwargs.get("task_name"):
+            del kwargs["task_name"]
+
 
         if not self.client:
             self.client = self.get_client()
