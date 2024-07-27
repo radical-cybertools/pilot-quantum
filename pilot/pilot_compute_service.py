@@ -81,6 +81,7 @@ class PilotComputeService:
         # self.validate_pcd(pilot_compute_description)
 
         pilot_name = pilot_compute_description.get("name", f"pilot-{uuid.uuid4()}")
+        pilot_compute_description["name"] = pilot_name
         
         worker_cluster_manager = self.__get_cluster_manager(self.execution_engine, self.pcs_working_directory)
 

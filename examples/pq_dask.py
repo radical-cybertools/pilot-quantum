@@ -18,9 +18,8 @@ pilot_compute_description_dask = {
 
 def start_pilot():
     pcs = PilotComputeService()
-    dp = pcs.create_pilot(pilot_compute_description=pilot_compute_description_dask)
-    dp.wait()
-    return dp
+    pcs.create_pilot(pilot_compute_description=pilot_compute_description_dask)
+    return pcs
 
 def pennylane_quantum_circuit():
     wires = 4
@@ -38,29 +37,23 @@ def pennylane_quantum_circuit():
 
 
 if __name__ == "__main__":
-    dask_pilot, dask_client = None, None
-
     try:
         # Start Pilot
-        dask_pilot = start_pilot()
-
-        # Get Dask client details
-        dask_client = dask_pilot.get_client()
-        print(dask_client.scheduler_info())
+        pcs = start_pilot()
 
         tasks = []
         for i in range(1000):
-            k = dask_pilot.submit_task(f"task_sleep-{i}",sleep, 3)
+            k = pcs.submit_task(sleep, 3)
             tasks.append(k)
 
-        dask_pilot.wait_tasks(tasks)
+        pcs.wait_tasks(tasks)
 
         tasks = []
         for i in range(1000):
-            k = dask_pilot.submit_task(f"task_pennylane-{i}", pennylane_quantum_circuit)
+            k = pcs.submit_task(pennylane_quantum_circuit, task_name = f"task_pennylane-{i}" )
             tasks.append(k)
 
-        dask_pilot.wait_tasks(tasks)        
+        pcs.wait_tasks(tasks)        
     finally:
-        if dask_pilot:
-            dask_pilot.cancel()
+        if pcs:
+            pcs.cancel()

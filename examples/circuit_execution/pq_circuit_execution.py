@@ -53,7 +53,7 @@ if __name__ == "__main__":
 
         tasks = []
         for i, co in enumerate(circuits_observables):
-            k = dask_pilot.submit_task(f"task_ce-{i}",run_circuit, co, {"method": "statevector"})
+            k = dask_pilot.submit_task(run_circuit, co, {"method": "statevector"}, task_name = f"task_qiskit-{i}" )
             tasks.append(k)
 
         dask_pilot.wait_tasks(tasks)

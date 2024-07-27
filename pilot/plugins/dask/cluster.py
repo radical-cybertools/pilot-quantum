@@ -57,20 +57,19 @@ class Manager:
             pids = result.stdout.strip().split('\n')
             for pid in pids:
                 if pid:
-                    print(f"Stopping existing scheduler with PID: {pid}")
+                    print(f"Stopping existing dask process with PID: {pid}")
                     subprocess.run(['kill', '-9', pid])
         except Exception as e:
             print(f"Error stopping existing schedulers: {e}")
 
     def start_scheduler(self):
         # Stop any existing Dask schedulers
-        self.stop_existing_processes('dask-scheduler')
-        self.stop_existing_processes('dask-workers')
+        self.stop_existing_processes('dask')
 
         # Start a new Dask scheduler in the background
         log_file = 'dask_scheduler.log'
         with open(log_file, 'w') as f:
-            process = subprocess.Popen(['dask-scheduler'], stdout=f, stderr=subprocess.STDOUT)
+            process = subprocess.Popen(['dask', 'scheduler'], stdout=f, stderr=subprocess.STDOUT)
 
         
         # Wait and read the log file to get the scheduler address
@@ -118,6 +117,9 @@ class Manager:
             arguments = ["-m", "pilot.plugins.dask.bootstrap_dask", "-t", self.dask_worker_type]
             if "cores_per_node" in pilot_compute_description:
                 arguments.extend(["-p", str(self.pilot_compute_description["cores_per_node"])])
+
+            arguments.extend(["-s", self.scheduler_info_file])
+            arguments.extend(["-n", self.pilot_compute_description['name']])
 
             self.logger.debug(f"Run {executable} Args: {arguments}")
         else:
@@ -188,7 +190,7 @@ class Manager:
         self.logger.info(f"Starting Dask workers with scheduler address: {self.host}")
 
         #Start dask workers on all nodes in background and write the worker address to a file
-        command = f"dask-worker --nthreads {self.pilot_compute_description.get('cores_per_node', 1)} --name {self.pilot_compute_description['name']} --memory-limit 3GB {self.host} &"
+        command = f"dask worker --nthreads {self.pilot_compute_description.get('cores_per_node', 1)} --name {self.pilot_compute_description['name']} --memory-limit 3GB {self.host} &"
         self.logger.info(f"Starting worker with command: {command}")
         subprocess.Popen(command, shell=True)
 
@@ -234,13 +236,7 @@ class Manager:
         time.sleep(2)
 
         # Stop the scheduler
-        self.stop_existing_processes('dask-worker')
-
-
-        time.sleep(2)
-
-        # Stop the scheduler
-        self.stop_existing_processes('dask-scheduler')
+        self.stop_existing_processes('dask')
 
 
     def submit_compute_unit(function_name):
