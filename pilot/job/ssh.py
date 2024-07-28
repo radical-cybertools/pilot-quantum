@@ -72,7 +72,7 @@ class Job(object):
         if urlparse(resource_url).username is not None:
             self.user = urlparse(resource_url).username
         self.logger.debug("URL: " + str(self.resource_url) + " Host: " + self.host)
-        self.id = "pilot-quantum-ssh" + str(uuid.uuid1())
+        self.id = "pilot-quantum-ssh-" + str(uuid.uuid1())
         self.job_id = self.id
         self.job_timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         self.job_output = open(
