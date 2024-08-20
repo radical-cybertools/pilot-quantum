@@ -11,8 +11,8 @@ pilot_compute_description_dask = {
     "resource": RESOURCE_URL_HPC,
     "working_directory": WORKING_DIRECTORY,
     "type": "dask",
-    "number_of_nodes": 10,
-    "cores_per_node": 10,
+    "number_of_nodes": 1,
+    "cores_per_node": 2,
 }
 
 
@@ -48,15 +48,16 @@ if __name__ == "__main__":
         dask_client = dask_pilot.get_client()
         print(dask_client.scheduler_info())
 
+        print("Start sleep 1 tasks")
         tasks = []
-        for i in range(1000):
-            k = dask_pilot.submit_task(f"task_sleep-{i}",sleep, 3)
+        for i in range(10):
+            k = dask_pilot.submit_task(f"task_sleep-{i}",sleep, 1)
             tasks.append(k)
 
         dask_pilot.wait_tasks(tasks)
-
+        print("Start Pennylane tasks")
         tasks = []
-        for i in range(1000):
+        for i in range(10):
             k = dask_pilot.submit_task(f"task_pennylane-{i}", pennylane_quantum_circuit)
             tasks.append(k)
 

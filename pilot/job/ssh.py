@@ -7,6 +7,7 @@ import sys
 import time
 import traceback
 import uuid
+import pprint
 from urllib.parse import urlparse
 
 from pilot.pcs_logger import PilotComputeServiceLogger
@@ -72,7 +73,7 @@ class Job(object):
         if urlparse(resource_url).username is not None:
             self.user = urlparse(resource_url).username
         self.logger.debug("URL: " + str(self.resource_url) + " Host: " + self.host)
-        self.id = "pilot-quantum-ssh" + str(uuid.uuid1())
+        self.id = "pilot-quantum-ssh-" + str(uuid.uuid1())
         self.job_id = self.id
         self.job_timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         self.job_output = open(
@@ -120,7 +121,8 @@ class Job(object):
             args.extend(["ssh", "-l", self.user, self.host, "/bin/date"])
             
         
-        self.logger.debug("Execute: " + str(args))
+        #self.logger.debug("Execute: " + str(args))
+        self.logger.debug("Execute: " + pprint.pformat(args))
         subprocess_handle = subprocess.Popen(args=args,
                                              stdout=self.job_output,
                                              stderr=self.job_error,

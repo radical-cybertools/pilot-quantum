@@ -53,8 +53,14 @@ class Manager:
             self.logger.debug(f"Run {executable} Args: {arguments}")
         else:
             js = pilot.job.ssh.Service(resource_url)
-            executable = "/bin/hostname"
-            arguments = ""
+            executable = "python"
+            arguments = ["-m", "pilot.plugins.dask.bootstrap_dask", "-t", self.dask_worker_type]
+            if "cores_per_node" in pilot_compute_description:
+                arguments.extend(["-p", str(self.pilot_compute_description["cores_per_node"])])
+
+            self.logger.debug(f"Run {executable} Args: {arguments}")
+            #executable = "/bin/hostname"
+            #arguments = ""
 
         jd = {"executable": executable, "arguments": arguments}
         jd.update(pilot_compute_description)
@@ -79,33 +85,33 @@ class Manager:
             self.batch_job_id = self.job.get_id()
             self.logger.info(f"Job: {self.batch_job_id} State: {self.job.get_state()}")
 
-            if not job_service.resource_url.startswith("slurm"):
-                self.run_dask()  # run dask on cloud platforms
+            # if not job_service.resource_url.startswith("slurm"):
+            #     self.run_dask()  # run dask on cloud platforms
 
             return self.job
         except Exception as ex:
             self.logger.error(f"An error occurred: {str(ex)}")
             raise ex
 
-    def run_dask(self):
-        self.nodes = self.job.get_nodes_list()
-        self.host = self.nodes[0]  # first node is master host - requires public ip to connect to
+    # def run_dask(self):
+    #     self.nodes = self.job.get_nodes_list()
+    #     self.host = self.nodes[0]  # first node is master host - requires public ip to connect to
 
-        worker_options = {"nthreads": self.pilot_compute_description.get("cores_per_node", 1), 
-                          "n_workers": self.pilot_compute_description.get("number_of_nodes", 1),
-                          "memory_limit": '3GB'}
-        hosts = list(np.append(self.nodes[0], self.nodes))
-        self.dask_cluster = SSHCluster(hosts,
-                                       connect_options={"known_hosts": None},
-                                       worker_options=worker_options,
-                                       scheduler_options={"port": 0, "dashboard_address": ":8797"})
-        client = Client(self.dask_cluster)
-        self.logger.info(client.scheduler_info())
-        self.host = client.scheduler_info()["address"]
+    #     worker_options = {"nthreads": self.pilot_compute_description.get("cores_per_node", 1), 
+    #                       "n_workers": self.pilot_compute_description.get("number_of_nodes", 1),
+    #                       "memory_limit": '3GB'}
+    #     hosts = list(np.append(self.nodes[0], self.nodes))
+    #     self.dask_cluster = SSHCluster(hosts,
+    #                                    connect_options={"known_hosts": None },
+    #                                    worker_options=worker_options,
+    #                                    scheduler_options={"port": 0, "dashboard_address": ":8797"})
+    #     client = Client(self.dask_cluster)
+    #     self.logger.info(client.scheduler_info())
+    #     self.host = client.scheduler_info()["address"]
 
-        if self.host is not None:
-            with open(os.path.join(self.working_directory, "dask_scheduler"), "w") as master_file:
-                master_file.write(self.host)
+    #     if self.host is not None:
+    #         with open(os.path.join(self.working_directory, "dask_scheduler"), "w") as master_file:
+    #             master_file.write(self.host)
 
     def wait(self):
         while True:
