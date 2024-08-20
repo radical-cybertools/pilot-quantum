@@ -4,18 +4,18 @@ import pennylane as qml
 from pilot.pilot_compute_service import PilotComputeService
 from time import sleep
 
-RESOURCE_URL_HPC = "ssh://localhost"
+RESOURCE_URL_HPC = "slurm://localhost"
 WORKING_DIRECTORY = os.path.join(os.environ["HOME"], "work")
 
 pilot_compute_description_dask = {
     "resource": RESOURCE_URL_HPC,
     "working_directory": WORKING_DIRECTORY,
     "type": "dask",
-    "number_of_nodes": 10,
-    "cores_per_node": 10,
+    "number_of_nodes": 1,
+    "cores_per_node": 2,
     "queue": "debug",
     "walltime": 30,
-    "type": "ray",
+    "type": "dask",
     "project": "m4408",
     "conda_environment": "/pscratch/sd/l/luckow/conda/quantum-mini-apps2",
     "scheduler_script_commands": ["#SBATCH --constraint=cpu"]
