@@ -71,13 +71,13 @@ def fit_circuit_to_target():
 
     wires = 11
     layers = 2
-    # dev = qml.device('default.qubit', wires=wires)
+    dev = qml.device('default.qubit', wires=wires)
     
-    # @qml.qnode(dev)
-    # def circuit(parameters):
-    #     parameters = parameters.reshape((layers, wires, 3))
-    #     qml.StronglyEntanglingLayers(weights=parameters, wires=range(wires))
-    #     return qml.state()
+    @qml.qnode(dev)
+    def circuit(parameters):
+        parameters = parameters.reshape((layers, wires, 3))
+        qml.StronglyEntanglingLayers(weights=parameters, wires=range(wires))
+        return qml.state()
 
     def loss_fn(params, target):
         return 1 - np.sum(np.abs(target.conj() * circuit(params)))
