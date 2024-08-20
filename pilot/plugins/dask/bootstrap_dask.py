@@ -207,7 +207,12 @@ class DaskBootstrap():
 
     def launch_dask_scheduler_via_command_line(self, scheduler_port=8786):
         logging.debug(f"Launching Dask scheduler started at {self.master}:{scheduler_port}")
-        scheduler_command = f"ssh {self.master} dask scheduler"
+        conda_env = os.environ.get("CONDA_DEFAULT_ENV", "")
+        if conda_env:
+            scheduler_command = f"bash -c 'conda activate {conda_env} && ssh {self.master} dask scheduler'"
+        else:
+            scheduler_command = f"ssh {self.master} dask scheduler"
+
         subprocess.Popen(scheduler_command, shell=True)
         client_info = self.check_dask()
         logging.debug(client_info)
@@ -221,12 +226,21 @@ class DaskBootstrap():
     def launch_dask_workers_via_command_line(self, scheduler_port=8786):
         master_url = f"{self.master}:{scheduler_port}"
         logging.debug(f"Launching Workers against Dask scheduler started at {master_url}")
-        worker_command = f"dask worker {master_url}"
-        if self.worker_type == "dask-cuda":
-            worker_command = f"dask cuda worker {master_url}"
+        conda_env = os.environ.get("CONDA_DEFAULT_ENV", "")
 
+        if conda_env:
+            if self.worker_type == "dask-cuda":
+                worker_command = f"bash -c 'conda activate {conda_env} && dask cuda worker {master_url} --nthreads {self.cores_per_node}'"
+            else:
+                worker_command = f"bash -c 'conda activate {conda_env} && dask worker {master_url} --nthreads {self.cores_per_node}'"
+        else:
+            if self.worker_type == "dask-cuda":
+                worker_command = f"dask cuda worker {master_url} --nthreads {self.cores_per_node}"
+            else:
+                worker_command = f"dask worker {master_url} --nthreads {self.cores_per_node}"
+    
         for node in self.nodes:
-            ssh_worker_command = f"ssh {node} {worker_command} --nthreads {self.cores_per_node}"
+            ssh_worker_command = f"ssh {node} {worker_command}"
             subprocess.Popen(ssh_worker_command, shell=True)
             logging.debug(f"Dask worker started on {node} using {ssh_worker_command}")
 

@@ -13,6 +13,12 @@ pilot_compute_description_dask = {
     "type": "dask",
     "number_of_nodes": 10,
     "cores_per_node": 10,
+    "queue": "debug",
+    "walltime": 30,
+    "type": "ray",
+    "project": "m4408",
+    "conda_environment": "/pscratch/sd/l/luckow/conda/quantum-mini-apps2",
+    "scheduler_script_commands": ["#SBATCH --constraint=cpu"]
 }
 
 
