@@ -11,13 +11,13 @@ pilot_compute_description_dask = {
     "resource": RESOURCE_URL_HPC,
     "working_directory": WORKING_DIRECTORY,
     "type": "dask",
-    "number_of_nodes": 10,
+    "number_of_nodes": 2,
     "cores_per_node": 10,
 }
 
 
 def start_pilot():
-    pcs = PilotComputeService()
+    pcs = PilotComputeService(working_directory=WORKING_DIRECTORY)
     pcs.create_pilot(pilot_compute_description=pilot_compute_description_dask)
     return pcs
 

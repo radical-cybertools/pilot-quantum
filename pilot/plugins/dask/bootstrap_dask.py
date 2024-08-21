@@ -154,7 +154,7 @@ class DaskBootstrap():
         # self.dask_process = subprocess.Popen(command, shell=True)
         # print("Dask started.")
         self.kill_dask_processes_on_nodes(self.nodes)
-        self.launch_dask_scheduler_via_command_line()
+        # self.launch_dask_scheduler_via_command_line()
         self.launch_dask_workers_via_command_line()
 
     def check_dask(self):

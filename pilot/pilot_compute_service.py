@@ -91,7 +91,7 @@ class PilotComputeService:
         batch_job = worker_cluster_manager.submit_job(pilot_compute_description)
         self.pilot_id = batch_job.get_id()
 
-        self.metrics_file_name = os.path.join(self.pcs_working_directory, f"{self.pilot_id}-metrics.csv")
+        self.metrics_file_name = os.path.join(self.pcs_working_directory, "metrics.csv")
 
 
         details = worker_cluster_manager.get_config_data()
@@ -158,7 +158,7 @@ class PilotComputeService:
         if self.client is None:
             raise PilotAPIException("Cluster client isn't ready/provisioned yet")
 
-        print(f"Running task {task_name} with details func:{func.__name__};args {args};kwargs {kwargs}")
+        self.logger.info(f"Running task {task_name} with details func:{func.__name__};args {args};kwargs {kwargs}")
 
 
         metrics = {
@@ -199,7 +199,11 @@ class PilotComputeService:
             return result             
         
         if pilot_scheduled != 'ANY':
-            task_future = self.client.submit(task_func, self.metrics_file_name, *args, **kwargs, workers=pilot_scheduled)
+            # find all the wokers in the pilot
+            workers = self.client.scheduler_info()['workers']
+            pilot_workers = [workers[worker]['name'] for worker in workers if workers[worker]['name'].startswith(pilot_scheduled)]
+
+            task_future = self.client.submit(task_func, self.metrics_file_name, *args, **kwargs, workers=pilot_workers)
         else:
             task_future = self.client.submit(task_func, self.metrics_file_name, *args, **kwargs)
 
@@ -218,13 +222,16 @@ class PilotComputeService:
         if self.client is None:
             raise PilotAPIException("Cluster client isn't ready/provisioned yet")
 
-        print(f"Running qtask with args {args}, kwargs {kwargs}")
+        self.logger.info(f"Running qtask with args {args}, kwargs {kwargs}")
         wrapper_func = self.task(func)
         return wrapper_func(*args, **kwargs).result()
     
     def wait_tasks(self, tasks):
         wait(tasks)
 
+        for task in tasks:
+            if task.done() and task.exception() is not None:                                
+                self.logger.info(f"Task {task} completed {task.status} with exception: {task.exception()}")
 
 
 
