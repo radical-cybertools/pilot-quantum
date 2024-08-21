@@ -35,7 +35,6 @@ class Manager:
     def __init__(self, pcs_working_directory, job_id=None):
         self.pcs_working_directory = pcs_working_directory
         self.scheduler_info_file=f'{self.pcs_working_directory}/dask_scheduler'
-        self.scheduler = None
         self.host = None
         self.dask_cluster = None
         self.batch_job_id = None
@@ -63,8 +62,13 @@ class Manager:
             print(f"Error stopping existing schedulers: {e}")
 
     def start_scheduler(self):
+        # Stop any existing Dask workers
+        self.stop_existing_processes('dask worker')
+
         # Stop any existing Dask schedulers
-        self.stop_existing_processes('dask')
+        self.stop_existing_processes('dask scheduler')
+
+
 
         # Start a new Dask scheduler in the background
         log_file = 'dask_scheduler.log'
@@ -118,7 +122,8 @@ class Manager:
             if "cores_per_node" in pilot_compute_description:
                 arguments.extend(["-p", str(self.pilot_compute_description["cores_per_node"])])
 
-            arguments.extend(["-s", self.scheduler_info_file])
+            arguments.extend(["-s", "True"])
+            arguments.extend(["-f", self.scheduler_info_file])
             arguments.extend(["-n", self.pilot_compute_description['name']])
 
             self.logger.debug(f"Run {executable} Args: {arguments}")
@@ -191,7 +196,7 @@ class Manager:
         self.logger.info(f"Starting Dask workers with scheduler address: {self.host}")
 
         #Start dask workers on all nodes in background and write the worker address to a file
-        command = f"dask worker --nthreads {self.pilot_compute_description.get('cores_per_node', 1)} --name {self.pilot_compute_description['name']} --memory-limit 3GB {self.host} &"
+        command = f"dask worker --nworkers {self.pilot_compute_description.get('number_of_nodes',1)} --nthreads {self.pilot_compute_description.get('cores_per_node', 1)} --name {self.pilot_compute_description['name']} --memory-limit 3GB {self.host} &"
         self.logger.info(f"Starting worker with command: {command}")
         subprocess.Popen(command, shell=True)
 
@@ -236,8 +241,11 @@ class Manager:
 
         time.sleep(2)
 
+        # Stop any existing Dask workers
+        self.stop_existing_processes('dask worker')
+
         # Stop the scheduler
-        self.stop_existing_processes('dask')
+        self.stop_existing_processes('dask scheduler')
 
 
     def submit_compute_unit(function_name):

@@ -80,11 +80,7 @@ if __name__ == "__main__":
         dask_client = dask_pilot.get_client()
         print(dask_client.scheduler_info())
 
-
-        # Get Dask client details
-        dask_client.run()
-
-        a = dask_pilot.submit_task(train_model, data_set_name, data, model)
+        a = dask_pilot.submit_task("train_model", train_model, data_set_name, data, model)
         print(f"{a.result()}\n")
     finally:
         if dask_pilot:

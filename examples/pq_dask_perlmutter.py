@@ -4,7 +4,7 @@ import pennylane as qml
 from pilot.pilot_compute_service import PilotComputeService
 from time import sleep
 
-RESOURCE_URL_HPC = "ssh://localhost"
+RESOURCE_URL_HPC = "slurm://localhost"
 WORKING_DIRECTORY = os.path.join(os.environ["HOME"], "work")
 
 pilot_compute_description_dask = {
@@ -13,12 +13,18 @@ pilot_compute_description_dask = {
     "type": "dask",
     "number_of_nodes": 2,
     "cores_per_node": 10,
+    "queue": "premium",
+    "walltime": 60,
+    "project": "m4408",
+    "scheduler_script_commands": ["#SBATCH --constraint=cpu"],
+    "name": "cpu_pilot"
 }
 
 
 def start_pilot():
     pcs = PilotComputeService(working_directory=WORKING_DIRECTORY)
-    pcs.create_pilot(pilot_compute_description=pilot_compute_description_dask)
+    pc = pcs.create_pilot(pilot_compute_description=pilot_compute_description_dask)
+    pc.wait()
     return pcs
 
 def pennylane_quantum_circuit():
@@ -37,19 +43,20 @@ def pennylane_quantum_circuit():
 
 
 if __name__ == "__main__":
+    pcs = None
     try:
         # Start Pilot
         pcs = start_pilot()
 
         tasks = []
-        for i in range(1000):
+        for i in range(10):
             k = pcs.submit_task(sleep, 3)
             tasks.append(k)
 
         pcs.wait_tasks(tasks)
 
         tasks = []
-        for i in range(1000):
+        for i in range(10):
             k = pcs.submit_task(pennylane_quantum_circuit, task_name = f"task_pennylane-{i}" )
             tasks.append(k)
 
