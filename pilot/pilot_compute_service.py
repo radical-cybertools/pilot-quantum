@@ -47,7 +47,7 @@ class PilotComputeService:
         self.logger = PilotComputeServiceLogger()        
         self.logger.info("PilotComputeService initialized.")        
         self.pilots = {}
-        self.client = None
+        self.client = None        
 
 
     def get_pilots(self):
@@ -69,6 +69,16 @@ class PilotComputeService:
         """
         self.logger.info("Cancelling PilotComputeService.")
         self.cluster_manager.cancel()
+        self.logger.info("Terminating scheduler ....")
+
+        for pilot_name, pilot in self.pilots.items():
+            self.logger.info("Terminating pilot {pilot_name} ....")
+            pilot.cancel()
+
+        
+
+
+
 
 
     def create_pilot(self, pilot_compute_description):

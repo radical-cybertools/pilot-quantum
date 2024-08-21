@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """ Dask Bootstrap Script (based on Dask Distributed 2.23.x release) """
+import json
 import os, sys
 import pdb
 import urllib.request, urllib.parse, urllib.error
@@ -38,7 +39,7 @@ def handler(signum, frame):
 class DaskBootstrap():
 
     def __init__(self, working_directory, dask_home, config_name="default", extension_job_id=None, cores_per_node=None,
-                 worker_type="dask"):
+                 worker_type="dask", scheduler_address="localhost:8786"):
         self.working_directory = working_directory
         self.dask_home = dask_home
         self.config_name = config_name
@@ -46,7 +47,7 @@ class DaskBootstrap():
         self.job_working_directory = os.path.join(WORKING_DIRECTORY)
         self.job_conf_dir = os.path.join(self.job_working_directory, "config")
         self.nodes = []
-        self.master = ""
+        self.scheduler_address = scheduler_address
         self.dask_process = None
         self.extension_job_id = extension_job_id
         self.cores_per_node = cores_per_node
@@ -137,9 +138,9 @@ class DaskBootstrap():
         logging.debug("Dask Instance Configuration Directory: " + self.job_conf_dir)
         self.nodes = self.get_nodelist_from_resourcemanager()
         logging.debug("Dask nodes: " + str(self.nodes))
-        self.master = self.nodes[0]  # socket.gethostname().split(".")[0]
-        with open(os.path.join(WORKING_DIRECTORY, "dask_scheduler"), "w") as master_file:
-            master_file.write(self.master + ":8786")
+        # self.scheduler_address = self.nodes[0]  # socket.gethostname().split(".")[0]
+        # with open(os.path.join(WORKING_DIRECTORY, "dask_scheduler"), "w") as master_file:
+        #     master_file.write(self.scheduler_address + ":8786")
 
     def start_dask(self):
         # logging.debug("Start Dask")
@@ -161,7 +162,7 @@ class DaskBootstrap():
         try:
             import distributed
             logging.debug("Nodes: %s" % (str(self.nodes)))
-            client = distributed.Client(self.master + ":8786")
+            client = distributed.Client(self.scheduler_address)
             return client.scheduler_info()
         except Exception as e:
             logging.debug("failed with error: %s" % e)
@@ -206,8 +207,8 @@ class DaskBootstrap():
                 logging.debug(f"An error occurred: {ex}")
 
     def launch_dask_scheduler_via_command_line(self, scheduler_port=8786):
-        logging.debug(f"Launching Dask scheduler started at {self.master}:{scheduler_port}")
-        scheduler_command = f"ssh {self.master} dask scheduler"
+        logging.debug(f"Launching Dask scheduler started at {self.scheduler_address}:{scheduler_port}")
+        scheduler_command = f"ssh {self.scheduler_address} dask scheduler"
         subprocess.Popen(scheduler_command, shell=True)
         client_info = self.check_dask()
         logging.debug(client_info)
@@ -216,17 +217,20 @@ class DaskBootstrap():
             logging.debug(client_info)
             client_info = self.check_dask()
             time.sleep(1)
-        logging.debug(f"Dask scheduler started at {self.master}:{scheduler_port}")
+        logging.debug(f"Dask scheduler started at {self.scheduler_address}:{scheduler_port}")
 
-    def launch_dask_workers_via_command_line(self, scheduler_port=8786):
-        master_url = f"{self.master}:{scheduler_port}"
-        logging.debug(f"Launching Workers against Dask scheduler started at {master_url}")
-        worker_command = f"dask worker {master_url}"
+    def launch_dask_workers_via_command_line(self, scheduler_port=8786):        
+        logging.debug(f"Launching Workers against Dask scheduler started at {self.scheduler_address}")
+        worker_command = f"dask worker {self.scheduler_address}"
         if self.worker_type == "dask-cuda":
-            worker_command = f"dask cuda worker {master_url}"
+            worker_command = f"dask cuda worker {self.scheduler_address}"
+
+        logging.debug(f"Launching Workers using base command: {worker_command} on nodes: {self.nodes}")
 
         for node in self.nodes:
+            logging.debug(f"Launching Worker on node {node}")
             ssh_worker_command = f"ssh {node} {worker_command} --nthreads {self.cores_per_node}"
+            logging.debug(f"launching worker on node {node} using command: {ssh_worker_command}")
             subprocess.Popen(ssh_worker_command, shell=True)
             logging.debug(f"Dask worker started on {node} using {ssh_worker_command}")
 
@@ -235,7 +239,7 @@ class DaskBootstrap():
         os.system("killall -s 9 dask-scheduler")
         os.system("pkill -9 dask-worker")
         time.sleep(5)
-        command = "%s --scheduler %s %s" % (self.dask_ssh, self.master, " ".join(self.nodes))
+        command = "%s --scheduler %s %s" % (self.dask_ssh, self.scheduler_address, " ".join(self.nodes))
         logging.debug("Start Dask Cluster Extension: " + command)
         # status = subprocess.call(command, shell=True)
         self.dask_process = subprocess.Popen(command, shell=True)
@@ -245,9 +249,9 @@ class DaskBootstrap():
         logging.debug("Dask Instance Configuration Directory: " + self.job_conf_dir)
         self.nodes = self.get_nodelist_from_resourcemanager()
         logging.debug("Dask nodes: " + str(self.nodes))
-        self.master = self.find_parent_dask_scheduler()
+        self.scheduler_address = self.find_parent_dask_scheduler()
         with open(os.path.join(WORKING_DIRECTORY, "dask_scheduler"), "w") as master_file:
-            master_file.write(self.master + ":8786")
+            master_file.write(self.scheduler_address + ":8786")
 
     def find_parent_dask_scheduler(self):
         path_to_parent_dask_job = os.path.join(os.getcwd(), "..", self.extension_job_id, "dask_scheduler")
@@ -286,6 +290,9 @@ if __name__ == "__main__":
                       help="Core Per Node")
     parser.add_option("-t", "--worker-type", type="string", action="store", dest="worker_type", default="dask",
                       help="Dask worker type; acceptable values are dask/dask-cuda")
+    parser.add_option("-f", "--scheduler_info_file", type="string", action="store", dest="scheduler_info_file", 
+                      help="Scheduler info to connect to..")
+    
 
     parser.add_option("-n", "--config_name", action="store", type="string", dest="config_name", default="default")
 
@@ -294,6 +301,8 @@ if __name__ == "__main__":
     print("nodes: %s" % str(node_list))
 
     run_timestamp = datetime.datetime.now()
+
+
     performance_trace_filename = "dask_performance_" + run_timestamp.strftime("%Y%m%d-%H%M%S") + ".csv"
     dask_config_filename = "dask_config_" + run_timestamp.strftime("%Y%m%d-%H%M%S")
     performance_trace_file = open(os.path.join(WORKING_DIRECTORY, performance_trace_filename), "a")
@@ -307,12 +316,19 @@ if __name__ == "__main__":
     except:
         print("No Dask Distributed found. Please install Dask Distributed!")
 
+    with open(options.scheduler_info_file, "r") as f:
+        scheduler_info = json.load(f)
+        scheduler_address = scheduler_info["address"]
+        scheduler_address = scheduler_address.replace("tcp://", "")
+
+
     # initialize object for managing dask clusters
-    dask = DaskBootstrap(WORKING_DIRECTORY, None, None, options.jobid, options.cores_per_node, options.worker_type)
+    dask = DaskBootstrap(WORKING_DIRECTORY, None, None, options.jobid, options.cores_per_node, options.worker_type, scheduler_address)
     if options.jobid is not None and options.jobid != "None":
         logging.debug("Extend Dask Cluster with PS ID: %s" % options.jobid)
         dask.extend()
     elif options.start:
+        logging.debug("Starting cluster.." + str(number_nodes))
         dask_start_time = time.time()
         dask.start()
         dask_nodes = []

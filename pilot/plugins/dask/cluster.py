@@ -35,7 +35,6 @@ class Manager:
     def __init__(self, pcs_working_directory, job_id=None):
         self.pcs_working_directory = pcs_working_directory
         self.scheduler_info_file=f'{self.pcs_working_directory}/dask_scheduler'
-        self.scheduler = None
         self.host = None
         self.dask_cluster = None
         self.batch_job_id = None
@@ -123,7 +122,8 @@ class Manager:
             if "cores_per_node" in pilot_compute_description:
                 arguments.extend(["-p", str(self.pilot_compute_description["cores_per_node"])])
 
-            arguments.extend(["-s", self.scheduler_info_file])
+            arguments.extend(["-s", "True"])
+            arguments.extend(["-f", self.scheduler_info_file])
             arguments.extend(["-n", self.pilot_compute_description['name']])
 
             self.logger.debug(f"Run {executable} Args: {arguments}")
