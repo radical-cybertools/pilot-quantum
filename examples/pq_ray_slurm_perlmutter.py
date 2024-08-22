@@ -113,7 +113,7 @@ def f(x):
 
 
 def start_pilot(pilot_compute_description):
-    pcs = PilotComputeService(working_directory=WORKING_DIRECTORY)
+    pcs = PilotComputeService()
     dp = pcs.create_pilot(pilot_compute_description=pilot_compute_description)
     print("waiting for Ray pilot to start")
     dp.wait()
