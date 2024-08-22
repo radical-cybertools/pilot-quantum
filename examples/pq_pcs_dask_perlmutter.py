@@ -23,8 +23,7 @@ pilot_compute_description_dask = {
 
 def start_pilot():
     pcs = PilotComputeService(working_directory=WORKING_DIRECTORY)
-    pc = pcs.create_pilot(pilot_compute_description=pilot_compute_description_dask)
-    pc.wait()
+    pcs.create_pilot(pilot_compute_description=pilot_compute_description_dask)
     return pcs
 
 def pennylane_quantum_circuit():

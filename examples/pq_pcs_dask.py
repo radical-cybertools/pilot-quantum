@@ -42,14 +42,14 @@ if __name__ == "__main__":
         pcs = start_pilot()
 
         tasks = []
-        for i in range(1000):
+        for i in range(10):
             k = pcs.submit_task(sleep, 3)
             tasks.append(k)
 
         pcs.wait_tasks(tasks)
 
         tasks = []
-        for i in range(1000):
+        for i in range(10):
             k = pcs.submit_task(pennylane_quantum_circuit, task_name = f"task_pennylane-{i}" )
             tasks.append(k)
 

@@ -103,6 +103,12 @@ class PilotComputeService:
 
         self.metrics_file_name = os.path.join(self.pcs_working_directory, "metrics.csv")
 
+        with open(self.metrics_file_name, 'a', newline='') as csvfile:
+            fieldnames = ['task_id','pilot_scheduled','submit_time', 'wait_time_secs', 'completion_time', 'execution_ms', 'status', 'error_msg']
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            if csvfile.tell() == 0:
+                writer.writeheader()        
+
 
         details = worker_cluster_manager.get_config_data()
         self.logger.info(f"Cluster details: {details}")
@@ -200,14 +206,11 @@ class PilotComputeService:
             with open(metrics_fn, 'a', newline='') as csvfile:
                 fieldnames = ['task_id','pilot_scheduled','submit_time', 'wait_time_secs', 'completion_time', 'execution_ms', 'status', 'error_msg']
                 writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-
-                if csvfile.tell() == 0:
-                    writer.writeheader()
-
                 writer.writerow(metrics)
 
             return result             
         
+
         if pilot_scheduled != 'ANY':
             # find all the wokers in the pilot
             workers = self.client.scheduler_info()['workers']
