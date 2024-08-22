@@ -11,20 +11,16 @@ pilot_compute_description_dask = {
     "resource": RESOURCE_URL_HPC,
     "working_directory": WORKING_DIRECTORY,
     "type": "dask",
-<<<<<<<< HEAD:examples/pq_pcs_dask.py
-    "number_of_nodes": 2,
-    "cores_per_node": 10,
-========
     "number_of_nodes": 1,
     "cores_per_node": 2,
->>>>>>>> main:examples/pq_dask_ssh_localhost.py
 }
 
 
 def start_pilot():
-    pcs = PilotComputeService(working_directory=WORKING_DIRECTORY)
-    pcs.create_pilot(pilot_compute_description=pilot_compute_description_dask)
-    return pcs
+    pcs = PilotComputeService()
+    dp = pcs.create_pilot(pilot_compute_description=pilot_compute_description_dask)
+    dp.wait()
+    return dp
 
 def pennylane_quantum_circuit():
     wires = 4
@@ -42,23 +38,19 @@ def pennylane_quantum_circuit():
 
 
 if __name__ == "__main__":
+    dask_pilot, dask_client = None, None
+
     try:
         # Start Pilot
-        pcs = start_pilot()
+        dask_pilot = start_pilot()
+
+        # Get Dask client details
+        dask_client = dask_pilot.get_client()
+        print(dask_client.scheduler_info())
 
         print("Start sleep 1 tasks")
         tasks = []
         for i in range(10):
-<<<<<<<< HEAD:examples/pq_pcs_dask.py
-            k = pcs.submit_task(sleep, 3)
-            tasks.append(k)
-
-        pcs.wait_tasks(tasks)
-
-        tasks = []
-        for i in range(10):
-            k = pcs.submit_task(pennylane_quantum_circuit, task_name = f"task_pennylane-{i}" )
-========
             k = dask_pilot.submit_task(f"task_sleep-{i}",sleep, 1)
             tasks.append(k)
 
@@ -67,10 +59,9 @@ if __name__ == "__main__":
         tasks = []
         for i in range(10):
             k = dask_pilot.submit_task(f"task_pennylane-{i}", pennylane_quantum_circuit)
->>>>>>>> main:examples/pq_dask_ssh_localhost.py
             tasks.append(k)
 
-        pcs.wait_tasks(tasks)        
+        dask_pilot.wait_tasks(tasks)        
     finally:
-        if pcs:
-            pcs.cancel()
+        if dask_pilot:
+            dask_pilot.cancel()

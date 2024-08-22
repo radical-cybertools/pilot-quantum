@@ -117,26 +117,18 @@ class Manager:
 
         if url_scheme.startswith("slurm"):
             js = pilot.job.slurm.Service(resource_url)
-            executable = "python"
-            arguments = ["-m", "pilot.plugins.dask.bootstrap_dask", "-t", self.dask_worker_type]
-            if "cores_per_node" in pilot_compute_description:
-                arguments.extend(["-p", str(self.pilot_compute_description["cores_per_node"])])
-
-            arguments.extend(["-s", "True"])
-            arguments.extend(["-f", self.scheduler_info_file])
-            arguments.extend(["-n", self.pilot_compute_description['name']])
-
-            self.logger.debug(f"Run {executable} Args: {arguments}")
         else:
             js = pilot.job.ssh.Service(resource_url)
-            executable = "python"
-            arguments = ["-m", "pilot.plugins.dask.bootstrap_dask", "-t", self.dask_worker_type]
-            if "cores_per_node" in pilot_compute_description:
-                arguments.extend(["-p", str(self.pilot_compute_description["cores_per_node"])])
-
-            self.logger.debug(f"Run {executable} Args: {arguments}")
-            #executable = "/bin/hostname"
-            #arguments = ""
+        
+        executable = "python"
+        arguments = ["-m", "pilot.plugins.dask.bootstrap_dask", "-t", self.dask_worker_type]
+        
+        arguments.extend(["-p", str(self.pilot_compute_description.get("cores_per_node", 1))])        
+        arguments.extend(["-s", "True"])
+        arguments.extend(["-f", self.scheduler_info_file])
+        arguments.extend(["-n", self.pilot_compute_description['name']])
+        
+        self.logger.debug(f"Run {executable} Args: {arguments}")
 
         jd = {"executable": executable, "arguments": arguments}
         jd.update(pilot_compute_description)
@@ -272,7 +264,7 @@ class Manager:
         return None
 
     def get_jobid(self):
-        return self.jobid
+        return self.job_id
 
     def get_config_data(self):
         if not self.is_scheduler_started():
