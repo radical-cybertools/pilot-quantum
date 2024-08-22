@@ -4,28 +4,23 @@ import pennylane as qml
 from pilot.pilot_compute_service import PilotComputeService
 from time import sleep
 
-RESOURCE_URL_HPC = "slurm://localhost"
+RESOURCE_URL_HPC = "ssh://localhost"
 WORKING_DIRECTORY = os.path.join(os.environ["HOME"], "work")
 
 pilot_compute_description_dask = {
     "resource": RESOURCE_URL_HPC,
     "working_directory": WORKING_DIRECTORY,
     "type": "dask",
-    "number_of_nodes": 2,
-    "cores_per_node": 10,
-    "queue": "premium",
-    "walltime": 60,
-    "project": "m4408",
-    "scheduler_script_commands": ["#SBATCH --constraint=cpu"],
-    "name": "cpu_pilot"
+    "number_of_nodes": 1,
+    "cores_per_node": 2,
 }
 
 
 def start_pilot():
     pcs = PilotComputeService(working_directory=WORKING_DIRECTORY)
-    pc = pcs.create_pilot(pilot_compute_description=pilot_compute_description_dask)
-    pc.wait()
-    return pcs
+    dp = pcs.create_pilot(pilot_compute_description=pilot_compute_description_dask)
+    dp.wait()
+    return dp
 
 def pennylane_quantum_circuit():
     wires = 4
@@ -43,24 +38,30 @@ def pennylane_quantum_circuit():
 
 
 if __name__ == "__main__":
-    pcs = None
+    dask_pilot, dask_client = None, None
+
     try:
         # Start Pilot
-        pcs = start_pilot()
+        dask_pilot = start_pilot()
 
+        # Get Dask client details
+        dask_client = dask_pilot.get_client()
+        print(dask_client.scheduler_info())
+
+        print("Start sleep 1 tasks")
         tasks = []
         for i in range(10):
-            k = pcs.submit_task(sleep, 3)
+            k = dask_pilot.submit_task(sleep, 1, task_name=f"task_sleep-{i}",)
             tasks.append(k)
 
-        pcs.wait_tasks(tasks)
-
+        dask_pilot.wait_tasks(tasks)
+        print("Start Pennylane tasks")
         tasks = []
         for i in range(10):
-            k = pcs.submit_task(pennylane_quantum_circuit, task_name = f"task_pennylane-{i}" )
+            k = dask_pilot.submit_task(pennylane_quantum_circuit, task_name=f"task_pennylane-{i}")
             tasks.append(k)
 
-        pcs.wait_tasks(tasks)        
+        dask_pilot.wait_tasks(tasks)        
     finally:
-        if pcs:
-            pcs.cancel()
+        if dask_pilot:
+            dask_pilot.cancel()
