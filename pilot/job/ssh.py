@@ -7,6 +7,7 @@ import sys
 import time
 import traceback
 import uuid
+import pprint
 from urllib.parse import urlparse
 
 from pilot.pcs_logger import PilotComputeServiceLogger
@@ -120,7 +121,8 @@ class Job(object):
             args.extend(["ssh", "-l", self.user, self.host, "/bin/date"])
             
         
-        self.logger.debug("Execute: " + str(args))
+        #self.logger.debug("Execute: " + str(args))
+        self.logger.debug("Execute: " + pprint.pformat(args))
         subprocess_handle = subprocess.Popen(args=args,
                                              stdout=self.job_output,
                                              stderr=self.job_error,

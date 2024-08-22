@@ -67,7 +67,7 @@ setup(name='Pilot-Quantum',
       packages=find_packages(),
       # data files for easy_install
       package_data={'': ['*.xml', '*.yaml', '*.properties']},
-      install_requires=['uuid', 'argparse', 'python-hostlist', 'dask', 'distributed', 'pyspark', 'paramiko',
+      install_requires=['uuid', 'argparse', 'python-hostlist', 'dask', 'distributed', 'pyspark', 'asyncssh',
                         'boto3'],
       entry_points={
           'console_scripts': ['pq=commandline.main:main',
