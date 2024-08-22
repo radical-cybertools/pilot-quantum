@@ -3,8 +3,11 @@
 Dask Cluster Manager
 """
 
+import asyncio
+import json
 import logging
 import os
+import subprocess
 import sys
 import time
 import uuid
@@ -19,12 +22,19 @@ import pilot.job.slurm
 import pilot.job.ssh
 from pilot.pcs_logger import PilotComputeServiceLogger
 
+from dask.distributed import Scheduler
+import psutil
+import time
+
+
 logging.getLogger("tornado.application").setLevel(logging.CRITICAL)
 logging.getLogger("distributed.utils").setLevel(logging.CRITICAL)
 
 
 class Manager:
-    def __init__(self, job_id=None):
+    def __init__(self, pcs_working_directory, job_id=None):
+        self.pcs_working_directory = pcs_working_directory
+        self.scheduler_info_file=f'{self.pcs_working_directory}/dask_scheduler'
         self.host = None
         self.dask_cluster = None
         self.batch_job_id = None
@@ -39,28 +49,86 @@ class Manager:
         if not self.job_id:
             self.job_id = f"dask-{uuid.uuid1()}"
 
+    def stop_existing_processes(self, process_name):
+        # Find the process IDs of all running dask-scheduler processes
+        try:
+            result = subprocess.run(['pgrep', '-f', process_name], stdout=subprocess.PIPE, text=True)
+            pids = result.stdout.strip().split('\n')
+            for pid in pids:
+                if pid:
+                    print(f"Stopping existing dask process with PID: {pid}")
+                    subprocess.run(['kill', '-9', pid])
+        except Exception as e:
+            print(f"Error stopping existing schedulers: {e}")
+
+    def start_scheduler(self):
+        # Stop any existing Dask workers
+        self.stop_existing_processes('dask worker')
+
+        # Stop any existing Dask schedulers
+        self.stop_existing_processes('dask scheduler')
+
+
+
+        # Start a new Dask scheduler in the background
+        log_file = 'dask_scheduler.log'
+        with open(log_file, 'w') as f:
+            process = subprocess.Popen(['dask', 'scheduler'], stdout=f, stderr=subprocess.STDOUT)
+
+        
+        # Wait and read the log file to get the scheduler address
+        scheduler_address = None
+        timeout = 10  # seconds
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            with open(log_file, 'r') as f:
+                lines = f.readlines()
+            for line in lines:
+                if "Scheduler at:" in line:
+                    scheduler_address = line.strip().split()[-1]
+                    break
+            if scheduler_address:
+                break
+            time.sleep(1)
+
+        if scheduler_address is None:
+            raise RuntimeError("Failed to start Dask scheduler")
+        
+        print(f"Scheduler started at {scheduler_address}")
+        
+        # Write scheduler address to file
+        scheduler_info = {
+            'address': scheduler_address
+        }
+        with open(self.scheduler_info_file, 'w') as f:
+            json.dump(scheduler_info, f)
+        self.logger.info(f"Scheduler details written to {self.scheduler_info_file}")
+        
+        return process
+  
+    
+    def get_scheduler_info_file(self):
+        return self.scheduler_info_file
+
+
     def _setup_job(self, pilot_compute_description):
         resource_url = pilot_compute_description["resource"]
         url_scheme = urlparse(resource_url).scheme
 
         if url_scheme.startswith("slurm"):
             js = pilot.job.slurm.Service(resource_url)
-            executable = "python"
-            arguments = ["-m", "pilot.plugins.dask.bootstrap_dask", "-t", self.dask_worker_type]
-            if "cores_per_node" in pilot_compute_description:
-                arguments.extend(["-p", str(self.pilot_compute_description["cores_per_node"])])
-
-            self.logger.debug(f"Run {executable} Args: {arguments}")
         else:
             js = pilot.job.ssh.Service(resource_url)
-            executable = "python"
-            arguments = ["-m", "pilot.plugins.dask.bootstrap_dask", "-t", self.dask_worker_type]
-            if "cores_per_node" in pilot_compute_description:
-                arguments.extend(["-p", str(self.pilot_compute_description["cores_per_node"])])
-
-            self.logger.debug(f"Run {executable} Args: {arguments}")
-            #executable = "/bin/hostname"
-            #arguments = ""
+        
+        executable = "python"
+        arguments = ["-m", "pilot.plugins.dask.bootstrap_dask", "-t", self.dask_worker_type]
+        
+        arguments.extend(["-p", str(self.pilot_compute_description.get("cores_per_node", 1))])        
+        arguments.extend(["-s", "True"])
+        arguments.extend(["-f", self.scheduler_info_file])
+        arguments.extend(["-n", self.pilot_compute_description['name']])
+        
+        self.logger.debug(f"Run {executable} Args: {arguments}")
 
         jd = {"executable": executable, "arguments": arguments}
         jd.update(pilot_compute_description)
@@ -71,12 +139,14 @@ class Manager:
     def submit_job(self, pilot_compute_description):
         try:
             self.pilot_compute_description = pilot_compute_description
-            self.pilot_compute_description["working_directory"] = os.path.join(
-                self.pilot_compute_description["working_directory"], self.job_id)
-            self.working_directory = self.pilot_compute_description["working_directory"]
-            self.dask_worker_type = self.pilot_compute_description["type"]
+            self.pilot_compute_description['working_directory'] = os.path.join(self.pcs_working_directory, self.job_id)
+            self.working_directory = self.pilot_compute_description['working_directory']
+            self.dask_worker_type = self.pilot_compute_description.get("type", "dask")
 
-            os.makedirs(self.working_directory)
+            try:
+                os.makedirs(self.working_directory)
+            except Exception:
+                pass
 
             job_service, job_description = self._setup_job(pilot_compute_description)
 
@@ -85,8 +155,13 @@ class Manager:
             self.batch_job_id = self.job.get_id()
             self.logger.info(f"Job: {self.batch_job_id} State: {self.job.get_state()}")
 
-            # if not job_service.resource_url.startswith("slurm"):
-            #     self.run_dask()  # run dask on cloud platforms
+            # <<<<<<< HEAD
+            #             if not job_service.resource_url.startswith("slurm"):
+            #                 self.start_dask_workers()  # run dask on cloud platforms
+            # =======
+            #             # if not job_service.resource_url.startswith("slurm"):
+            #             #     self.run_dask()  # run dask on cloud platforms
+            # >>>>>>> main
 
             return self.job
         except Exception as ex:
@@ -112,6 +187,29 @@ class Manager:
     #     if self.host is not None:
     #         with open(os.path.join(self.working_directory, "dask_scheduler"), "w") as master_file:
     #             master_file.write(self.host)
+
+    # # start dask workers using dask-worker command and scheduler address
+    # def start_dask_workers(self):
+
+    #     # get dash scheduler address
+    #     with open(self.scheduler_info_file, 'r') as f:
+    #         self.host = json.load(f)['address']
+
+    #     # Get the address
+    #     self.logger.info(f"Starting Dask workers with scheduler address: {self.host}")
+
+    #     #Start dask workers on all nodes in background and write the worker address to a file
+    #     command = f"dask worker --nworkers {self.pilot_compute_description.get('number_of_nodes',1)} --nthreads {self.pilot_compute_description.get('cores_per_node', 1)} --name {self.pilot_compute_description['name']} --memory-limit 3GB {self.host} &"
+    #     self.logger.info(f"Starting worker with command: {command}")
+    #     subprocess.Popen(command, shell=True)
+
+    #     # wait for workers to start
+    #     time.sleep(2)
+
+    #     # get scheduler info
+    #     client = Client(self.host)
+    #     self.logger.info(client.scheduler_info())
+    #     self.dask_client = client
 
     def wait(self):
         while True:
@@ -140,10 +238,18 @@ class Manager:
             time.sleep(6)
 
     def cancel(self):
-        c = self.get_context()
-        c.run_on_scheduler(lambda dask_scheduler=None: dask_scheduler.close() & sys.exit(0))
-        self.dask_cluster.close()
-        # self.myjob.cancel()
+        # Stop the pilot jobs if any
+        if self.job:
+            self.job.cancel()
+
+        time.sleep(2)
+
+        # Stop any existing Dask workers
+        self.stop_existing_processes('dask worker')
+
+        # Stop the scheduler
+        self.stop_existing_processes('dask scheduler')
+
 
     def submit_compute_unit(function_name):
         pass
@@ -158,33 +264,27 @@ class Manager:
         return None
 
     def get_jobid(self):
-        return self.jobid
+        return self.job_id
 
     def get_config_data(self):
         if not self.is_scheduler_started():
             self.logger.debug("Scheduler not started")
             return None
-        master_file = os.path.join(self.working_directory, "dask_scheduler")
-        # print master_file
-        master = "localhost"
-        counter = 0
-        while os.path.exists(master_file) == False and counter < 600:
-            time.sleep(2)
-            counter = counter + 1
-
+        master_file = os.path.join(self.pcs_working_directory, "dask_scheduler")
+        # read the master json file and return the contents
         with open(master_file, 'r') as f:
-            master = f.read()
+            master_host = json.load(f)["address"]
 
-        if master.startswith("tcp://"):
-            details = {
-                "master_url": master
-            }
-        else:
-            master_host = master.split(":")[0]
-            details = {
+        master_host = urlparse(master_host).hostname
+
+        if master_host is None:
+            raise Exception("Scheduler not found")
+        
+        details = {
                 "master_url": "tcp://%s:8786" % master_host,
                 "web_ui_url": "http://%s:8787" % master_host,
             }
+        
         return details
 
     def get_client(self):
@@ -197,7 +297,7 @@ class Manager:
         self.logger.info("Dask Scheduler: %s", details["master_url"])
 
     def is_scheduler_started(self):
-        return os.path.exists(os.path.join(self.working_directory, "dask_scheduler"))
+        return os.path.exists(os.path.join(self.pcs_working_directory, "dask_scheduler"))
 
 
 if __name__ == "__main__":

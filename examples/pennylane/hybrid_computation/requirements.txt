@@ -1,2 +1,0 @@
-pennylane==0.25.1
-pennylane-sf==0.20.1
