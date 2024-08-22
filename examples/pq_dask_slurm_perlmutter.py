@@ -23,7 +23,7 @@ pilot_compute_description_dask = {
 
 
 def start_pilot():
-    pcs = PilotComputeService(working_directory=WORKING_DIRECTORY)
+    pcs = PilotComputeService()
     dp = pcs.create_pilot(pilot_compute_description=pilot_compute_description_dask)
     dp.wait()
     return dp
@@ -57,14 +57,14 @@ if __name__ == "__main__":
         print("Start sleep 1 tasks")
         tasks = []
         for i in range(10):
-            k = dask_pilot.submit_task(sleep, 1, task_name=f"task_sleep-{i}")
+            k = dask_pilot.submit_task(f"task_sleep-{i}",sleep, 1)
             tasks.append(k)
 
         dask_pilot.wait_tasks(tasks)
         print("Start Pennylane tasks")
         tasks = []
         for i in range(10):
-            k = dask_pilot.submit_task(pennylane_quantum_circuit, task_name=f"task_pennylane-{i}")
+            k = dask_pilot.submit_task(f"task_pennylane-{i}", pennylane_quantum_circuit)
             tasks.append(k)
 
         dask_pilot.wait_tasks(tasks)        
