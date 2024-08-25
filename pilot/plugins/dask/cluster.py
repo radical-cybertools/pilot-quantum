@@ -39,7 +39,7 @@ class Manager:
         self.dask_cluster = None
         self.batch_job_id = None
         self.job = None
-        self.logger = PilotComputeServiceLogger()
+        self.logger = PilotComputeServiceLogger(self.pcs_working_directory)
         self.dask_worker_type = None
         self.working_directory = None
         self.pilot_compute_description = None
@@ -71,7 +71,7 @@ class Manager:
 
 
         # Start a new Dask scheduler in the background
-        log_file = 'dask_scheduler.log'
+        log_file = os.path.join(self.pcs_working_directory, 'dask_scheduler.log')
         with open(log_file, 'w') as f:
             process = subprocess.Popen(['dask', 'scheduler'], stdout=f, stderr=subprocess.STDOUT)
 
