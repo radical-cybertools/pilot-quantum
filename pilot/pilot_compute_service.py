@@ -32,10 +32,14 @@ class PilotAPIException(Exception):
     pass
 
 class PilotComputeBase:
-    def __init__(self, metrics_file_name):
-        self.metrics_file_name = metrics_file_name
+    def __init__(self, working_directory):
+        self.pcs_working_directory = working_directory
+        if not os.path.exists(self.pcs_working_directory):            
+            os.makedirs(self.pcs_working_directory)
+
+        self.metrics_file_name = os.path.join(self.pcs_working_directory, "metrics.csv")
         self.client = None
-        self.logger = PilotComputeServiceLogger()
+        self.logger = PilotComputeServiceLogger(self.pcs_working_directory)
 
     def submit_task(self, func, *args, **kwargs):
         pilot_scheduled = 'ANY'
@@ -129,11 +133,10 @@ class PilotComputeBase:
 
 
 class PilotComputeService(PilotComputeBase):
-    def __init__(self, execution_engine=ExecutionEngine.DASK, working_directory="/tmp"):                
-        self.pcs_working_directory = f"{working_directory}/pcs-{uuid.uuid4()}"
-        os.makedirs(self.pcs_working_directory)
-
-        super().__init__(os.path.join(self.pcs_working_directory, "metrics.csv"))
+    def __init__(self, execution_engine=ExecutionEngine.DASK, working_directory="/tmp"):
+        self.pcs_working_directory = f"{working_directory}/pcs-{uuid.uuid4()}"                
+        super().__init__(self.pcs_working_directory)
+        self.logger.info(f"Initializing PilotComputeService with execution engine {execution_engine} and working directory {self.pcs_working_directory}")
         self.execution_engine = execution_engine
         
         self.cluster_manager = self.__get_cluster_manager(execution_engine, self.pcs_working_directory)
@@ -165,7 +168,7 @@ class PilotComputeService(PilotComputeBase):
 
         details = worker_cluster_manager.get_config_data()
         self.logger.info(f"Cluster details: {details}")
-        pilot = PilotCompute(self.metrics_file_name, batch_job, cluster_manager=worker_cluster_manager)
+        pilot = PilotCompute(batch_job, cluster_manager=worker_cluster_manager)
 
         self.pilots[pilot_name] = pilot
         return pilot
@@ -210,8 +213,8 @@ class PilotComputeService(PilotComputeBase):
 
 
 class PilotCompute(PilotComputeBase):
-    def __init__(self, metrics_file_name, batch_job=None, cluster_manager=None):
-        super().__init__(metrics_file_name)
+    def __init__(self, batch_job=None, cluster_manager=None):
+        super().__init__(cluster_manager.pcs_working_directory)
         self.batch_job = batch_job
         self.cluster_manager = cluster_manager
         self.client = None

@@ -31,9 +31,10 @@ class Job(object):
     """Constructor"""
 
     def __init__(self, job_description, resource_url):
-
         self.job_description = job_description
-        self.logger = PilotComputeServiceLogger()
+        self.working_directory = self.job_description["working_directory"]
+        self.logger = PilotComputeServiceLogger(self.working_directory)
+
 
         self.command = self.job_description["executable"]
         args = None
@@ -74,7 +75,7 @@ class Job(object):
 
         self.pilot_compute_description['number_cores'] = self.pilot_compute_description['cores_per_node'] * self.pilot_compute_description['number_of_nodes']
 
-        self.working_directory = self.pilot_compute_description["working_directory"]
+
 
         ### convert walltime in minutes to SLURM representation of time ###
         walltime_slurm = "01:00:00"
@@ -201,10 +202,10 @@ class Job(object):
             self.logger.debug("Pilot SLURM job submission failed: %s" % err)
             raise err
 
-        # start_command = ("ssh %s " % target_host)
-        # start_command = start_command + ("rm %s" % os.path.basename(tmpf_name))
-        # print(("Cleanup: %s" % start_command))
-        # status = subprocess.call(start_command, shell=True)
+        start_command = ("ssh %s " % target_host)
+        start_command = start_command + ("rm %s" % os.path.basename(tmpf_name))
+        print(("Cleanup: %s" % start_command))
+        status = subprocess.call(start_command, shell=True)
         self.job_id = self.get_local_job_id(outstr)
         if self.job_id == None or self.job_id == "":
             raise Exception("Pilot Submission via slurm+ssh:// failed")

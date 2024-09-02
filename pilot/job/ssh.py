@@ -34,7 +34,6 @@ class Service(object):
         """Constructor"""
         self.resource_url = resource_url
         self.pilot_compute_description = pilot_compute_description
-        self.logger = PilotComputeServiceLogger()
 
     def create_job(self, job_description):
         if "pilot_compute_description" in job_description:
@@ -53,11 +52,8 @@ class Job(object):
 
     def __init__(self, job_description, resource_url, pilot_compute_description):
         self.resource_url = resource_url
-        self.logger = PilotComputeServiceLogger()
-
         self.job_description = job_description
         self.pilot_compute_description = job_description
-
         self.working_directory = os.getcwd()
 
         if "working_directory" in self.job_description:
@@ -67,6 +63,7 @@ class Job(object):
             except:
                 pass
 
+        self.logger = PilotComputeServiceLogger(self.working_directory)
         self.logger.info(f"Working_directory {self.working_directory}, Job Description: {self.job_description}")
         self.host = urlparse(resource_url).hostname
         self.user = None
@@ -76,10 +73,8 @@ class Job(object):
         self.id = "pilot-quantum-ssh-" + str(uuid.uuid1())
         self.job_id = self.id
         self.job_timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-        self.job_output = open(
-                                os.path.join(self.working_directory,"pilotquantum_agent_ssh_output_" + self.job_timestamp + ".log"), "w")
-        self.job_error = open(
-                              os.path.join(self.working_directory, "pilotquantum_agent_ssh_error_" + self.job_timestamp + ".log"), "w")
+        self.job_output = open(os.path.join(self.working_directory,"agent.out"), "w")
+        self.job_error = open(os.path.join(self.working_directory, "agent.err"), "w")
         self.ssh_process = None
 
     def run(self):
