@@ -68,7 +68,7 @@ setup(name='Pilot-Quantum',
       # data files for easy_install
       package_data={'': ['*.xml', '*.yaml', '*.properties']},
       install_requires=['uuid', 'argparse', 'python-hostlist', 'dask', 'distributed', 'pyspark', 'asyncssh',
-                        'boto3'],
+                        "pennylane"],
       entry_points={
           'console_scripts': ['pq=commandline.main:main',
                               'pilot-quantum=commandline.main:main']

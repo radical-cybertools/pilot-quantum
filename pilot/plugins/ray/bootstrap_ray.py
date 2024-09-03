@@ -216,7 +216,7 @@ class RayBootstrap():
                         ray start --address %s --num-cpus=%d --num-gpus=%d"""%(self.ray_headnode_address , self.cores_per_node, self.gpu_per_nodes)
             
             result=execute_ssh_command(host=i, 
-                                       user=getpass.getuser(),              command=command, arguments=None,
+                                       user=getpass.getuser(), command=command, arguments=None,
                                        working_directory=self.working_directory,
                                        job_output=self.job_output, job_error=self.job_error)
 
