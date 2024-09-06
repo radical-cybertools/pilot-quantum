@@ -4,10 +4,15 @@ import time
 import uuid
 
 from distributed import Future
+import ray
 
+from pilot.pilot_enums_exceptions import ExecutionEngine, PilotAPIException
 from pilot.pcs_logger import PilotComputeServiceLogger
-from pilot.plugins.dask import cluster as dask_cluster_manager
-from pilot.plugins.ray import cluster as ray_cluster_manager
+# from pilot.plugins.dask import cluster as dask_cluster_manager
+from pilot.plugins.dask_v2 import cluster as dask_cluster_manager
+from pilot.plugins.ray_v2 import cluster as ray_cluster_manager
+
+# from pilot.plugins.ray import cluster as ray_cluster_manager
 import os
 from dask.distributed import wait
 from datetime import datetime
@@ -17,25 +22,17 @@ import os
 import time
 import uuid
 from datetime import datetime
-from enum import Enum
-
-ExecutionEngine = Enum('ExecutionEngine', ["RAY", "DASK"])
 
 
 
-
-class ExecutionEngine(Enum):
-    DASK = "dask"
-    RAY = "ray"
-
-class PilotAPIException(Exception):
-    pass
 
 class PilotComputeBase:
     def __init__(self, working_directory):
         self.pcs_working_directory = working_directory
         if not os.path.exists(self.pcs_working_directory):            
             os.makedirs(self.pcs_working_directory)
+
+        # self.tasks = []
 
         self.metrics_file_name = os.path.join(self.pcs_working_directory, "metrics.csv")
         self.client = None
@@ -96,16 +93,24 @@ class PilotComputeBase:
             return result             
         
 
-        if pilot_scheduled != 'ANY':
-            # find all the wokers in the pilot
-            workers = self.client.scheduler_info()['workers']
-            pilot_workers = [workers[worker]['name'] for worker in workers if workers[worker]['name'].startswith(pilot_scheduled)]
+        if self.execution_engine == ExecutionEngine.DASK:
+            if pilot_scheduled != 'ANY':
+                # find all the wokers in the pilot
+                workers = self.client.scheduler_info()['workers']
+                pilot_workers = [workers[worker]['name'] for worker in workers if workers[worker]['name'].startswith(pilot_scheduled)]
 
-            task_future = self.client.submit(task_func, self.metrics_file_name, *args, **kwargs, workers=pilot_workers)
-        else:
-            task_future = self.client.submit(task_func, self.metrics_file_name, *args, **kwargs)
+                task_future = self.client.submit(task_func, self.metrics_file_name, *args, **kwargs, workers=pilot_workers)
+            else:
+                task_future = self.client.submit(task_func, self.metrics_file_name, *args, **kwargs)
+        elif self.execution_engine == ExecutionEngine.RAY:
+            with self.client:
+                task_future = ray.remote(task_func).remote(self.metrics_file_name, *args, **kwargs)
+                self.logger.info(ray.get(task_future))             
+    
 
         return task_future
+    
+
 
     def task(self, func):
         def wrapper(*args, **kwargs):
@@ -123,13 +128,12 @@ class PilotComputeBase:
         print(f"Running qtask with args {args}, kwargs {kwargs}")
         wrapper_func = self.task(func)
         return wrapper_func(*args, **kwargs).result()
-
+    
     def wait_tasks(self, tasks):
-        wait(tasks)
+        self.cluster_manager.wait_tasks(tasks)
+        
 
-        for task in tasks:
-            if task.done() and task.exception() is not None:                                
-                self.logger.info(f"Task {task} completed {task.status} with exception: {task.exception()}")
+
 
 
 class PilotComputeService(PilotComputeBase):
@@ -158,27 +162,28 @@ class PilotComputeService(PilotComputeBase):
         pilot_name = pilot_compute_description.get("name", f"pilot-{uuid.uuid4()}")
         pilot_compute_description["name"] = pilot_name
 
-        worker_cluster_manager = self.__get_cluster_manager(self.execution_engine, self.pcs_working_directory)
+        # worker_cluster_manager = self.__get_cluster_manager(self.execution_engine, self.pcs_working_directory)
 
         self.logger.info(f"Create Pilot with description {pilot_compute_description}")
         pilot_compute_description["working_directory"] = self.pcs_working_directory
 
-        batch_job = worker_cluster_manager.submit_job(pilot_compute_description)
+        batch_job = self.cluster_manager.submit_pilot(pilot_compute_description)
         self.pilot_id = batch_job.get_id()
 
-        details = worker_cluster_manager.get_config_data()
+        details = self.cluster_manager.get_config_data()
         self.logger.info(f"Cluster details: {details}")
-        pilot = PilotCompute(batch_job, cluster_manager=worker_cluster_manager)
+        pilot = PilotCompute(batch_job, cluster_manager=self.cluster_manager)
 
         self.pilots[pilot_name] = pilot
         return pilot
 
     def __get_cluster_manager(self, execution_engine, working_directory):
         if execution_engine == ExecutionEngine.DASK:
-            return dask_cluster_manager.Manager(working_directory)  # Replace with appropriate manager
+            # return dask_cluster_manager.Manager(working_directory)  # Replace with appropriate manager
+            return dask_cluster_manager.DaskManager(working_directory)  # Replace with appropriate manager
         elif execution_engine == ExecutionEngine.RAY:
-            job_id = f"ray-{uuid.uuid1()}"
-            return ray_cluster_manager.Manager(job_id, working_directory)  # Replace with appropriate manager
+            # job_id = f"ray-{uuid.uuid1()}"
+            return ray_cluster_manager.RayManager(working_directory)  # Replace with appropriate manager
 
         self.logger.error(f"Invalid Pilot Compute Description: invalid type: {execution_engine}")
         raise PilotAPIException(f"Invalid Pilot Compute Description: invalid type: {execution_engine}")
@@ -209,12 +214,14 @@ class PilotComputeService(PilotComputeBase):
 
         for pilot_name, pilot in self.pilots.items():
             self.logger.info(f"Terminating pilot {pilot_name} ....")
-            pilot.cancel()        
+            pilot.cancel()    
+
+
 
 
 class PilotCompute(PilotComputeBase):
     def __init__(self, batch_job=None, cluster_manager=None):
-        super().__init__(cluster_manager.pcs_working_directory)
+        super().__init__(cluster_manager.working_directory)
         self.batch_job = batch_job
         self.cluster_manager = cluster_manager
         self.client = None
@@ -230,7 +237,7 @@ class PilotCompute(PilotComputeBase):
             return self.batch_job.get_state()
 
     def get_id(self):
-        return self.cluster_manager.get_jobid()
+        return self.cluster_manager.get_id()
 
     def get_details(self):
         return self.cluster_manager.get_config_data()
@@ -245,9 +252,6 @@ class PilotCompute(PilotComputeBase):
         kwargs["pilot"] = self.get_id()
         return super().submit_task(func, *args, **kwargs)
 
-
-class PilotAPIException(Exception):
-    pass
 
 class PilotFuture:
     def __init__(self, future: Future):
