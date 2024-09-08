@@ -8,11 +8,9 @@ import ray
 
 from pilot.pilot_enums_exceptions import ExecutionEngine, PilotAPIException
 from pilot.pcs_logger import PilotComputeServiceLogger
-# from pilot.plugins.dask import cluster as dask_cluster_manager
 from pilot.plugins.dask_v2 import cluster as dask_cluster_manager
 from pilot.plugins.ray_v2 import cluster as ray_cluster_manager
 
-# from pilot.plugins.ray import cluster as ray_cluster_manager
 import os
 from dask.distributed import wait
 from datetime import datetime
@@ -31,8 +29,6 @@ class PilotComputeBase:
         self.pcs_working_directory = working_directory
         if not os.path.exists(self.pcs_working_directory):            
             os.makedirs(self.pcs_working_directory)
-
-        # self.tasks = []
 
         self.metrics_file_name = os.path.join(self.pcs_working_directory, "metrics.csv")
         self.client = None
@@ -103,11 +99,8 @@ class PilotComputeBase:
             else:
                 task_future = self.client.submit(task_func, self.metrics_file_name, *args, **kwargs)
         elif self.execution_engine == ExecutionEngine.RAY:
-            with self.client:
-                task_future = ray.remote(task_func).remote(self.metrics_file_name, *args, **kwargs)
-                self.logger.info(ray.get(task_future))             
-    
-
+            task_future = ray.remote(task_func).remote(self.metrics_file_name, *args, **kwargs)
+                
         return task_future
     
 
@@ -131,9 +124,9 @@ class PilotComputeBase:
     
     def wait_tasks(self, tasks):
         self.cluster_manager.wait_tasks(tasks)
-        
 
-
+    def get_results(self, tasks):
+        self.cluster_manager.get_results(tasks)        
 
 
 class PilotComputeService(PilotComputeBase):
@@ -161,8 +154,6 @@ class PilotComputeService(PilotComputeBase):
     def create_pilot(self, pilot_compute_description):
         pilot_name = pilot_compute_description.get("name", f"pilot-{uuid.uuid4()}")
         pilot_compute_description["name"] = pilot_name
-
-        # worker_cluster_manager = self.__get_cluster_manager(self.execution_engine, self.pcs_working_directory)
 
         self.logger.info(f"Create Pilot with description {pilot_compute_description}")
         pilot_compute_description["working_directory"] = self.pcs_working_directory

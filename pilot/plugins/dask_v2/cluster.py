@@ -7,7 +7,7 @@ import distributed
 from pilot import pilot_enums_exceptions
 from pilot.pilot_enums_exceptions import ExecutionEngine
 from pilot.pilot_compute_service import PilotAPIException
-from pilot.plugins.api import PilotManager
+from pilot.plugins.pilot_manager_base import PilotManager
 import subprocess
 
 

@@ -1,21 +1,20 @@
 import json
 import os
+import subprocess
 import time
 from urllib.parse import urlparse
 
-import distributed
 import ray
-from pilot import pilot_enums_exceptions
+
 from pilot.pilot_enums_exceptions import ExecutionEngine
-from pilot.pilot_compute_service import PilotAPIException
-from pilot.plugins.api import PilotManager
-import subprocess
+from pilot.plugins.pilot_manager_base import PilotManager
+from pilot.util.ssh_utils import execute_ssh_command, execute_ssh_command_as_daemon
 
 
 class RayManager(PilotManager):
     def __init__(self, working_directory):
         self.client = None
-        super().__init__(working_directory=working_directory, execution_engine=ExecutionEngine.RAY)
+        super().__init__(working_directory=working_directory, execution_engine=ExecutionEngine.RAY)        
 
     def stop_ray(self):
         # Stop the Ray scheduler
@@ -37,15 +36,23 @@ class RayManager(PilotManager):
         # Start a new Dask scheduler in the background
         log_file = os.path.join(self.working_directory, 'ray_scheduler.log')
         
+        
+        # with open(log_file, 'w') as f:
+        #     process = subprocess.Popen(['ray', 'start', '--head'], stdout=f, stderr=subprocess.STDOUT)
+        
         with open(log_file, 'w') as f:
-            process = subprocess.Popen(['ray', 'start', '--head'], stdout=f, stderr=subprocess.STDOUT)
+            status = execute_ssh_command(command="ray start --head", working_directory=self.working_directory, job_output=f)
+            self.logger.info(f"Ray scheduler started with status: {status}")
+            
+
+        
 
         # Wait and read the log file to get the scheduler address
         for i in range(10):
             time.sleep(5)
-            self.client = ray.init()
+            ray_client = ray.init(ignore_reinit_error=True, address="auto")
             try:
-                scheduler_address = self.client.address_info["address"] 
+                scheduler_address = ray_client.address_info["node_ip_address"] 
                 break
             except Exception as e:
                 self.logger.info(f"Ray scheduler not ready and getting address failed with error {e}. Waiting... {i}")
@@ -57,7 +64,9 @@ class RayManager(PilotManager):
         
         # Write scheduler address to file
         scheduler_info = {
-            'address': f"ray://{scheduler_address}"
+            'agent_scheduler_address': f"{scheduler_address}:6379",
+            'master_url': f"ray://{scheduler_address}:10001",
+            "web_ui_url": "http://%s:8265" % scheduler_address,
         }
         with open(self.scheduler_info_file, 'w') as f:
             json.dump(scheduler_info, f)
@@ -69,13 +78,24 @@ class RayManager(PilotManager):
         return super().submit_pilot(pilot_compute_description)
 
     def _get_saga_job_arguments(self):
-        arguments = ["-m", "pilot.plugins.ray.bootstrap_ray"]
-
-        arguments.extend(["-p", str(self.pilot_compute_description.get("cores_per_node", "1"))])        
-        arguments.extend(["-g", str(self.pilot_compute_description.get("gpus_per_node", "1"))])        
-        arguments.extend(["-w", str(self.pilot_compute_description.get("working_directory", "/tmp"))])
-
+        arguments = [ "-m", "pilot.plugins.ray_v2.agent",
+                     "-s", "True",
+                     "-w", self.pilot_working_directory,
+                     "-f", self.scheduler_info_file, 
+                     "-c", self.worker_config_file ]
+                     
+        
         return arguments
+
+    def create_worker_config_file(self):
+        worker_config = {
+            'cores_per_node': str(self.pilot_compute_description.get("cores_per_node", "1")),
+            'gpus_per_node': str(self.pilot_compute_description.get("gpus_per_node", "1"))
+        }
+        with open(self.worker_config_file, 'w') as f:
+            json.dump(worker_config, f)
+            
+        self.logger.info(f"Worker config file created: {self.worker_config_file}")
     
     def get_config_data(self):
         if not self.is_scheduler_started():
@@ -84,43 +104,12 @@ class RayManager(PilotManager):
         
         # read the master json file and return the contents
         with open(self.scheduler_info_file, 'r') as f:
-            master_host = json.load(f)["address"]
-
-        master_host = urlparse(master_host).hostname
-
-        if master_host is None:
-            raise Exception("Scheduler not found")
+            return json.load(f)
         
-        details = {
-                "master_url": "%s:10001" % master_host,
-                "web_ui_url": "http://%s:8265" % master_host,
-            }
-        
-        return details 
-    
+
     def wait(self):
         super().wait()
-        state = self.pilot_job.get_state().lower()
-
-        if state != "running":
-            raise PilotAPIException(f"Pilot Job {self.pilot_job_id} failed to start. State: {state}")
-
-        while True:
-            if self.is_scheduler_started():
-                try:
-                    self.logger.info("init distributed client")
-                    c = self.get_client()
-                    scheduler_info = c.scheduler_info()                    
-                    if len(scheduler_info.get('workers')) > 0:
-                        self.logger.info(str(c.scheduler_info()))
-                        c.close()
-                        return
-                    else:
-                        self.logger.info(f"Dask cluster is still initializing. Waiting... {scheduler_info}")
-                except IOError as e:
-                    self.logger.warning("Dask Client Connect Attempt {} failed".format(i))
-
-            time.sleep(5)
+        
 
     def get_client(self, configuration=None) -> object:
         """Returns Ray Client for Scheduler"""
@@ -128,18 +117,20 @@ class RayManager(PilotManager):
             details = self.get_config_data()
             if details:
                 self.logger.info("Connect to Ray: %s" % details["master_url"])
-                self.client = ray.init(address="ray://%s" % details["master_url"])
+                self.client = ray.init(address="%s" % details["master_url"])
         return self.client
 
     def cancel(self):
-        super().cancel()
+        ray.shutdown()
         self.stop_ray()
+        super().cancel()
+        
 
     def wait_tasks(self, tasks):
-        with self.get_client():
-            k = ray.get(tasks[0])
-            self.logger.info(f"Tasks completed: {k}")
-            return k
+        return ray.wait(tasks, num_returns=len(tasks))
+    
+    def get_results(self, tasks):
+        return ray.get(tasks)    
 
 
         

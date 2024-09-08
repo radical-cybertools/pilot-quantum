@@ -16,8 +16,12 @@ class PilotManager:
         self.working_directory = working_directory
         self.logger = PilotComputeServiceLogger(self.working_directory)
         self.scheduler_info_file=f'{self.working_directory}/scheduler'
+        self.worker_config_file=f'{self.working_directory}/worker_config.json'        
         self.execution_engine = execution_engine
         self.pilot_job = None
+        
+    def create_worker_config_file(self):
+        pass
 
     def get_id(self):
         return self.pilot_id
@@ -48,6 +52,7 @@ class PilotManager:
         self.pilot_id = self.execution_engine.name + "-" + uuid.uuid1().__str__()
         self.pilot_working_directory = os.path.join(self.working_directory, self.pilot_id)
         self.pilot_compute_description["working_directory"] = self.pilot_working_directory
+        self.create_worker_config_file()
         
         try:
             self.logger.info(f"Creating working directory: {self.pilot_working_directory}")
