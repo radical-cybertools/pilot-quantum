@@ -47,18 +47,17 @@ if __name__ == "__main__":
         pcs = start_pilot()
         
         ray_client = pcs.get_client()
-        # with ray_client:
-        #     print(ray.get([ray.remote(sleep).remote(i) for i in range(10)]))
+        with ray_client:
+            print(ray.get([ray.remote(square).remote(i) for i in range(10)]))
             
 
         tasks = []
         for i in range(10):
             k = pcs.submit_task(square, i, resources={'num_cpus': 1, 'num_gpus': 0, 'memory': None})
             tasks.append(k)
-            
-        
+                    
 
-        # pcs.wait_tasks(tasks)
+        pcs.wait_tasks(tasks)
         print(pcs.get_results(tasks))
         
         tasks = []

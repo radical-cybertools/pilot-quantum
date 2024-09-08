@@ -129,7 +129,7 @@ class PilotComputeBase:
         self.cluster_manager.wait_tasks(tasks)
 
     def get_results(self, tasks):
-        self.cluster_manager.get_results(tasks)        
+        return self.cluster_manager.get_results(tasks)    
 
 
 class PilotComputeService(PilotComputeBase):

@@ -125,10 +125,11 @@ class RayManager(PilotManager):
     def get_results(self, tasks):
         with self.get_client():
             try:
-                return ray.get(tasks)    
+                return ray.get(tasks)
             except Exception as e:
-                self.logger.error(f"Error getting results: {e}")
-                return None
+                self.logger.error(f"Error getting results: {e}")                
+        
+        return None
                 
 
 
