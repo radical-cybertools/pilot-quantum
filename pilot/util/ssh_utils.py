@@ -3,7 +3,7 @@ import time
 import subprocess
 
 
-def execute_ssh_command(host, user=None, command="/bin/date", arguments=None, working_directory=os.getcwd(),
+def execute_ssh_command(host="localhost", user=None, command="/bin/date", arguments=None, working_directory=os.getcwd(),
                         job_output=None, job_error=None, keyfile=None) -> object:
     """
     Execute SSH Command
