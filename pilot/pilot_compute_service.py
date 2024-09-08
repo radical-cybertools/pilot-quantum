@@ -70,6 +70,8 @@ class PilotComputeBase:
             metrics["wait_time_secs"] = (datetime.now()-metrics["submit_time"]).total_seconds()
             
             task_execution_start_time = time.time()
+            result = None
+            
             try:
                 result = func(*args, **kwargs)
                 metrics["status"] = "SUCCESS"
@@ -96,11 +98,12 @@ class PilotComputeBase:
                 pilot_workers = [workers[worker]['name'] for worker in workers if workers[worker]['name'].startswith(pilot_scheduled)]
 
                 task_future = self.client.submit(task_func, self.metrics_file_name, *args, **kwargs, workers=pilot_workers)
-            else:
+            else:                
                 task_future = self.client.submit(task_func, self.metrics_file_name, *args, **kwargs)
         elif self.execution_engine == ExecutionEngine.RAY:
-            task_future = ray.remote(task_func).remote(self.metrics_file_name, *args, **kwargs)
-                
+            # Extract resource options from kwargs (if any)
+            resources = kwargs.pop('resources', {})
+            task_future = ray.remote(task_func).options(**resources).remote(self.metrics_file_name, *args, **kwargs)                
         return task_future
     
 

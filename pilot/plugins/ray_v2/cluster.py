@@ -37,20 +37,13 @@ class RayManager(PilotManager):
         log_file = os.path.join(self.working_directory, 'ray_scheduler.log')
         
         
-        # with open(log_file, 'w') as f:
-        #     process = subprocess.Popen(['ray', 'start', '--head'], stdout=f, stderr=subprocess.STDOUT)
-        
         with open(log_file, 'w') as f:
-            status = execute_ssh_command(command="ray start --head", working_directory=self.working_directory, job_output=f)
-            self.logger.info(f"Ray scheduler started with status: {status}")
-            
-
+            process = subprocess.Popen(['ray', 'start', '--head'], stdout=f, stderr=subprocess.STDOUT)
         
-
         # Wait and read the log file to get the scheduler address
         for i in range(10):
             time.sleep(5)
-            ray_client = ray.init(ignore_reinit_error=True, address="auto")
+            ray_client = ray.init()
             try:
                 scheduler_address = ray_client.address_info["node_ip_address"] 
                 break
@@ -130,7 +123,13 @@ class RayManager(PilotManager):
         return ray.wait(tasks, num_returns=len(tasks))
     
     def get_results(self, tasks):
-        return ray.get(tasks)    
+        with self.get_client():
+            try:
+                return ray.get(tasks)    
+            except Exception as e:
+                self.logger.error(f"Error getting results: {e}")
+                return None
+                
 
 
         
