@@ -133,7 +133,7 @@ class PilotComputeBase:
 
 
 class PilotComputeService(PilotComputeBase):
-    def __init__(self, execution_engine=ExecutionEngine.DASK, working_directory="/tmp"):
+    def __init__(self, execution_engine, working_directory="/tmp"):
         self.pcs_working_directory = f"{working_directory}/pcs-{uuid.uuid4()}"                
         super().__init__(self.pcs_working_directory)
         self.logger.info(f"Initializing PilotComputeService with execution engine {execution_engine} and working directory {self.pcs_working_directory}")
