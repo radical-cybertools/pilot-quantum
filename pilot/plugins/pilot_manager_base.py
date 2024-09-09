@@ -7,13 +7,13 @@ import os
 import pilot
 from pilot import job
 from pilot.job import slurm, ssh
-from pilot.pilot_enums_exceptions import ExecutionEngine
 from pilot.pcs_logger import PilotComputeServiceLogger
 
 
 class PilotManager:
-    def __init__(self, working_directory, execution_engine=ExecutionEngine.DASK):
+    def __init__(self, working_directory, execution_engine):
         self.working_directory = working_directory
+        self.execution_engine = execution_engine
         self.logger = PilotComputeServiceLogger(self.working_directory)
         self.scheduler_info_file=f'{self.working_directory}/scheduler'
         self.worker_config_file=f'{self.working_directory}/worker_config.json'        
