@@ -38,7 +38,7 @@ class RayManager(PilotManager):
         
         
         with open(log_file, 'w') as f:
-            process = subprocess.Popen(['ray', 'start', '--head'], stdout=f, stderr=subprocess.STDOUT)
+            process = subprocess.Popen(['ray', 'start', '--head', "--num-cpus=0", "--num-gpus=0"], stdout=f, stderr=subprocess.STDOUT)
         
         # Wait and read the log file to get the scheduler address
         for i in range(10):

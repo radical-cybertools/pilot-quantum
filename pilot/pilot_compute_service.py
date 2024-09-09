@@ -222,8 +222,8 @@ class PilotCompute(PilotComputeBase):
         self.client = None
 
     def cancel(self):
-        if self.client:
-            self.client.close()
+        if self.cluster_manager:
+            self.cluster_manager.cancel()
         if self.batch_job:
             self.batch_job.cancel()
 
