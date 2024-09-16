@@ -36,75 +36,86 @@ class PilotComputeBase:
         self.logger = PilotComputeServiceLogger(self.pcs_working_directory)
 
     def submit_task(self, func, *args, **kwargs):
-        pilot_scheduled = 'ANY'
-        
-        if "pilot" in kwargs:
-            pilot_scheduled = kwargs["pilot"]
-            del kwargs["pilot"]
-
-        task_name = kwargs.get("task_name", f"task-{uuid.uuid4()}")
-        if kwargs.get("task_name"):
-            del kwargs["task_name"]
-
-
-        if not self.client:
-            self.client = self.get_client()
-
-        if self.client is None:
-            raise PilotAPIException("Cluster client isn't ready/provisioned yet")
-
-        self.logger.info(f"Running task {task_name} with details func:{func.__name__};args {args};kwargs {kwargs}")
-
-
-        metrics = {
-            'task_id': task_name,
-            'pilot_scheduled': pilot_scheduled,
-            'submit_time': datetime.now(),
-            'wait_time_secs': None, 
-            'completion_time': None,            
-            'execution_ms': None,
-            'status': None,
-            'error_msg': None,
-        }
-
-        def task_func(metrics_fn, *args, **kwargs):
-            metrics["wait_time_secs"] = (datetime.now()-metrics["submit_time"]).total_seconds()
+        task_future = None
+        try:
+            pilot_scheduled = 'ANY'
             
-            task_execution_start_time = time.time()
-            result = None
-            
-            try:
-                result = func(*args, **kwargs)
-                metrics["status"] = "SUCCESS"
-            except Exception as e:
-                metrics["status"] = "FAILED"
-                metrics["error_msg"] = str(e)
+            if "pilot" in kwargs:
+                pilot_scheduled = kwargs["pilot"]
+                del kwargs["pilot"]
+
+            task_name = kwargs.get("task_name", f"task-{uuid.uuid4()}")
+            if kwargs.get("task_name"):
+                del kwargs["task_name"]
+
+
+            if not self.client:
+                self.client = self.get_client()
+
+            if self.client is None:
+                raise PilotAPIException("Cluster client isn't ready/provisioned yet")
+
+            self.logger.info(f"Running task {task_name} with details func:{func.__name__}")
+
+
+            metrics = {
+                'task_id': task_name,
+                'pilot_scheduled': pilot_scheduled,
+                'submit_time': datetime.now(),
+                'wait_time_secs': None, 
+                'staging_time_secs': 0,
+                'completion_time': None,            
+                'execution_ms': None,
+                'status': None,
+                'error_msg': None,
+            }
+
+            def task_func(metrics_fn, *args, **kwargs):
+                metrics["wait_time_secs"] = (datetime.now()-metrics["submit_time"]).total_seconds()
                 
+                task_execution_start_time = time.time()
+                result = None
+                
+                try:
+                    result = func(*args, **kwargs)
+                    metrics["status"] = "SUCCESS"
+                except Exception as e:
+                    metrics["status"] = "FAILED"
+                    metrics["error_msg"] = str(e)
+                    
 
-            metrics["completion_time"] = datetime.now()
-            metrics["execution_ms"] = time.time() - task_execution_start_time
+                metrics["completion_time"] = datetime.now()
+                metrics["execution_ms"] = time.time() - task_execution_start_time
 
-            with open(metrics_fn, 'a', newline='') as csvfile:
-                fieldnames = ['task_id','pilot_scheduled','submit_time', 'wait_time_secs', 'completion_time', 'execution_ms', 'status', 'error_msg']
-                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-                writer.writerow(metrics)
+                with open(metrics_fn, 'a', newline='') as csvfile:
+                    fieldnames = ['task_id','pilot_scheduled','submit_time', 'wait_time_secs', 'staging_time_secs', 'completion_time', 'execution_ms', 'status', 'error_msg']
+                    writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                    writer.writerow(metrics)
 
-            return result             
+                return result             
+            
+
+            if self.execution_engine == ExecutionEngine.DASK:
+                if pilot_scheduled != 'ANY':
+                    # find all the wokers in the pilot
+                    workers = self.client.scheduler_info()['workers']
+                    pilot_workers = [workers[worker]['name'] for worker in workers if workers[worker]['name'].startswith(pilot_scheduled)]                    
+                    task_future = self.client.submit(task_func, self.metrics_file_name, *args, **kwargs, workers=pilot_workers)
+                else:                
+                    task_future = self.client.submit(task_func, self.metrics_file_name, *args, **kwargs)
+            elif self.execution_engine == ExecutionEngine.RAY:
+                # Extract resource options from kwargs (if any)
+                resources = kwargs.pop('resources', {})
+                staging_start_time = time.time()
+                args = [ray.put(arg) for arg in args]
+                kwargs = {key: ray.put(value) for key, value in kwargs.items()}
+                staging_end_time = time.time()
+                metrics["staging_time_secs"] = staging_end_time - staging_start_time
+                task_future = ray.remote(task_func).options(**resources).remote(self.metrics_file_name, *args, **kwargs)                    
+        except Exception as e:
+            self.logger.error(f"Error submitting task {task_name} with details func:{func.__name__} - {str(e)}")
+            raise PilotAPIException(f"Error submitting task {task_name} with details func:{func.__name__} - {str(e)}")
         
-
-        if self.execution_engine == ExecutionEngine.DASK:
-            if pilot_scheduled != 'ANY':
-                # find all the wokers in the pilot
-                workers = self.client.scheduler_info()['workers']
-                pilot_workers = [workers[worker]['name'] for worker in workers if workers[worker]['name'].startswith(pilot_scheduled)]
-
-                task_future = self.client.submit(task_func, self.metrics_file_name, *args, **kwargs, workers=pilot_workers)
-            else:                
-                task_future = self.client.submit(task_func, self.metrics_file_name, *args, **kwargs)
-        elif self.execution_engine == ExecutionEngine.RAY:
-            # Extract resource options from kwargs (if any)
-            resources = kwargs.pop('resources', {})
-            task_future = ray.remote(task_func).options(**resources).remote(self.metrics_file_name, *args, **kwargs)                
         return task_future
     
 
@@ -149,7 +160,7 @@ class PilotComputeService(PilotComputeBase):
         self.client = None
 
         with open(self.metrics_file_name, 'a', newline='') as csvfile:
-            fieldnames = ['task_id', 'pilot_scheduled', 'submit_time', 'wait_time_secs', 'completion_time',
+            fieldnames = ['task_id', 'pilot_scheduled', 'submit_time', 'wait_time_secs', 'staging_time_secs', 'completion_time',
                           'execution_ms', 'status', 'error_msg']
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             if csvfile.tell() == 0:

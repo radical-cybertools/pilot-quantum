@@ -120,14 +120,24 @@ class RayManager(PilotManager):
         
 
     def wait_tasks(self, tasks):
-        return ray.wait(tasks, num_returns=len(tasks))
+        completed = 0
+        running_ids = tasks
+        try:                
+            while completed < len(tasks):
+                ready, running_ids = ray.wait(running_ids, num_returns=1)
+                completed += len(ready)
+                self.logger.info(f"Tasks completed: {completed}, not ready: {len(running_ids)}")
+        except Exception as e:
+            self.logger.error(f"Error waiting for tasks: {e}")                
+
     
     def get_results(self, tasks):
-        with self.get_client():
-            try:
-                return ray.get(tasks)
-            except Exception as e:
-                self.logger.error(f"Error getting results: {e}")                
+        self.wait_tasks(tasks) 
+        
+        try:                                                   
+            return ray.get(tasks)
+        except Exception as e:
+            self.logger.error(f"Error getting results: {e}")                
         
         return None
                 

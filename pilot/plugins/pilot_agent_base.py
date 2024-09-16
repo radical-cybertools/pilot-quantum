@@ -10,6 +10,7 @@ class PilotAgent():
         self.working_directory = working_directory
         self.scheduler_file_path = scheduler_file_path
         self.worker_config_file = worker_config_file
+        logging.basicConfig(filename='agent.log', level=logging.INFO)
         self.logger = logging.getLogger(__name__)
     
     def get_expanded_hostlist(self, hosts):
@@ -28,7 +29,7 @@ class PilotAgent():
     
     def get_nodelist_from_resourcemanager(self):
         nodes = ["localhost"]
-        if os.environ.get("SLURM_NODELIST") is not None:
+        if os.environ.get("SLURM_NODELIST") is not None:            
             nodes = self.get_expanded_hostlist(os.environ.get("SLURM_NODELIST"))
         elif os.environ.get("PBS_NODEFILE") is not None:
             nodes = self.get_expanded_hostlist(os.environ.get("PBS_NODEFILE"))
