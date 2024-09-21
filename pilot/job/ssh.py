@@ -202,6 +202,8 @@ class Job(object):
             time.sleep(10)
             if self.ssh_process.poll is not None:
                 break
+            
+        os.system("stty sane")
 
     ###########################################################################
     # private methods
