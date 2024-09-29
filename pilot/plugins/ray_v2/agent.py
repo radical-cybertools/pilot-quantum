@@ -2,11 +2,12 @@
 import logging
 import os
 import signal
+import subprocess
 import time
 from optparse import OptionParser
 
 from pilot.plugins.pilot_agent_base import PilotAgent
-from pilot.util.ssh_utils import execute_ssh_command
+from pilot.util.ssh_utils import execute_local_process, execute_ssh_command, get_localhost
 
 STOP=False
 
@@ -42,8 +43,14 @@ class RayPilotAgent(PilotAgent):
                       f"ray start --address {scheduler_address} " \
                       f"--num-cpus={worker_config['cores_per_node']} " \
                       f"--num-gpus={worker_config['gpus_per_node']}"
-            
-            status = execute_ssh_command(host=node, command=command, working_directory=self.working_directory)
+                      
+
+                    
+            host_node_ip_address = get_localhost()
+            if scheduler_address.startswith(host_node_ip_address):
+                status = execute_local_process(command, working_directory=self.working_directory)
+            else:                    
+                status = execute_ssh_command(host=node, command=command, working_directory=self.working_directory)
             
             self.logger.info(f"Ray started on {node} with command {command} and status {status}")
         

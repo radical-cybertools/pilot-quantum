@@ -1,5 +1,6 @@
 import json
 import os
+import socket
 import subprocess
 import time
 from urllib.parse import urlparse
@@ -8,7 +9,8 @@ import ray
 
 from pilot.pilot_enums_exceptions import ExecutionEngine
 from pilot.plugins.pilot_manager_base import PilotManager
-from pilot.util.ssh_utils import execute_ssh_command, execute_ssh_command_as_daemon
+from pilot.util.ssh_utils import execute_ssh_command, execute_ssh_command_as_daemon, get_localhost
+import subprocess
 
 
 class RayManager(PilotManager):
@@ -37,21 +39,37 @@ class RayManager(PilotManager):
         log_file = os.path.join(self.working_directory, 'ray_scheduler.log')
         
         
+        host_node_ip_address = get_localhost()    
         with open(log_file, 'w') as f:
-            process = subprocess.Popen(['ray', 'start', '--head', "--num-cpus=0", "--num-gpus=0"], stdout=f, stderr=subprocess.STDOUT)
+            process = subprocess.Popen(['ray', 'start', '--head', f"--node-ip-address={host_node_ip_address}", "--num-cpus=0", "--num-gpus=0"], stdout=f, stderr=subprocess.STDOUT)
+                      
+        # Check the status of the process
+        process_status = process.poll()
+        while process_status is None:
+            time.sleep(5)
+            process_status = process.poll()
+        
+        if process_status==0:
+            self.logger.info("Ray scheduler started successfully.")
+        else:
+            self.logger.error(f"Failed to start Ray scheduler. Return code: {process_status}")
+            raise RuntimeError(f"Failed to start Ray scheduler. Return code: {process_status}")
+            
         
         # Wait and read the log file to get the scheduler address
         for i in range(10):
-            time.sleep(5)
-            ray_client = ray.init()
+            ray_client = ray.init(_node_ip_address=host_node_ip_address)
             try:
-                scheduler_address = ray_client.address_info["node_ip_address"] 
+                scheduler_address = ray_client.address_info["node_ip_address"]                 
                 break
             except Exception as e:
                 self.logger.info(f"Ray scheduler not ready and getting address failed with error {e}. Waiting... {i}")
 
         if scheduler_address is None:
             raise RuntimeError("Failed to start Ray scheduler")
+        
+        if not scheduler_address is host_node_ip_address:
+            raise RuntimeError("Node Ip address and Ray scheduler address mismatch")
         
         print(f"Scheduler started at {scheduler_address}")
         

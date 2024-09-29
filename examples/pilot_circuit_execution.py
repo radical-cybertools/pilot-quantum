@@ -26,7 +26,7 @@ from qiskit_aer.primitives import EstimatorV2
 
 
 
-RESOURCE_URL_HPC = "slurm://localhost"
+RESOURCE_URL_HPC = "ssh://localhost"
 WORKING_DIRECTORY = os.path.join(os.environ["HOME"], "work")
 
 pilot_compute_description_ray = {
@@ -55,13 +55,13 @@ def pre_processing():
     base_qubuits = 7
     scale = 1
     circuit = random_circuit(base_qubuits *scale, 6, max_operands=2, seed=1242)
-    observable = SparsePauliOp(["ZIIIIII"*scale, "IIIZIII"*scale, "IIIIIIZ"*scale])
+    observable = SparsePauliOp(["ZIIIIII"*scale, "IIIZIII"*scale, "IIIIIII"*scale])
 
     # Specify settings for the cut-finding optimizer
     optimization_settings = OptimizationParameters(seed=111)
 
     # Specify the size of the QPUs available
-    device_constraints = DeviceConstraints(qubits_per_subcircuit=2)
+    device_constraints = DeviceConstraints(qubits_per_subcircuit=4)
 
     cut_circuit, metadata = find_cuts(circuit, optimization_settings, device_constraints)
     print(
@@ -100,7 +100,7 @@ def execute_sampler(sampler, label, subsystem_subexpts, shots):
     result_start = time.time()
     result = job.result()    
     result_end = time.time()
-    print(f"Job {label} completed with job id {job.job_id()}, submit_time: {submit_end-submit_start} and execution_time: {result_end - result_start}")
+    print(f"Job {label} completed with job id {job.job_id()}, submit_time: {submit_end-submit_start} and execution_time: {result_end - result_start}, type: {type(result)}")
     return (label, result)
 
 if __name__ == "__main__":
@@ -115,7 +115,7 @@ if __name__ == "__main__":
             
             subexperiments, coefficients, subobservables, observable, circuit = pre_processing()
             
-            backend = AerSimulator(device="GPU")
+            backend = AerSimulator()
             print("*********************************** transpiling circuits ***********************************")
             # Transpile the subexperiments to ISA circuits
             pass_manager = generate_preset_pass_manager(optimization_level=1, backend=backend)
@@ -126,16 +126,19 @@ if __name__ == "__main__":
             
             tasks=[]
             i=0
+            sub_circuit_execution_time = time.time()
             with Batch(backend=backend) as batch:
                 sampler = SamplerV2(mode=batch)
                 print(f"*********************************** len of subexperiments {len(isa_subexperiments)}*************************")
                 for label, subsystem_subexpts in isa_subexperiments.items():
-                    task_future = pcs.submit_task(execute_sampler, sampler, label, subsystem_subexpts, shots=2**12, resources={'num_cpus': 2, 'num_gpus': 1, 'memory': None})
+                    task_future = pcs.submit_task(execute_sampler, sampler, label, subsystem_subexpts, shots=2**12, resources={'num_cpus': 1, 'num_gpus': 1, 'memory': None})
                     tasks.append(task_future)
                     i=i+1
 
             results_tuple=pcs.get_results(tasks)
-            print(results_tuple)
+            # print(results_tuple)
+            sub_circuit_execution_end_time = time.time()
+            print("Execution time for subcircuits: ", sub_circuit_execution_end_time-sub_circuit_execution_time)
             
             results = {}
             
@@ -152,7 +155,12 @@ if __name__ == "__main__":
             final_expval = np.dot(reconstructed_expvals, observable.coeffs)
             
             estimator = EstimatorV2()
-            exact_expval = estimator.run([(circuit, observable)]).result()[0].data.evs
+            full_circuit_transpilation = pass_manager.run(circuit)
+            full_circuit_estimator_time = time.time()
+            exact_expval = estimator.run([(full_circuit_transpilation, observable)]).result()[0].data.evs
+            full_circuit_estimator_end_time = time.time()
+            print("Execution time for full Circuit: ", full_circuit_estimator_end_time-full_circuit_estimator_time)
+            
             print(f"Reconstructed expectation value: {np.real(np.round(final_expval, 8))}")
             print(f"Exact expectation value: {np.round(exact_expval, 8)}")
             print(f"Error in estimation: {np.real(np.round(final_expval-exact_expval, 8))}")

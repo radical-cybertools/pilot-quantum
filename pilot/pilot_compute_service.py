@@ -1,3 +1,4 @@
+from copy import copy
 import csv
 import logging
 import time
@@ -22,7 +23,20 @@ import uuid
 from datetime import datetime
 
 
+METRICS = {
+    'task_id': None,
+    'pilot_scheduled': None,
+    'submit_time': datetime.now(),
+    'wait_time_secs': None, 
+    'staging_time_secs': 0,
+    'input_staging_data_size_bytes': 0,
+    'completion_time': None,            
+    'execution_ms': None,
+    'status': None,
+    'error_msg': None,
+}
 
+SORTED_METRICS_FIELDS = sorted(METRICS.keys())
 
 class PilotComputeBase:
     def __init__(self, execution_engine, working_directory):
@@ -34,6 +48,11 @@ class PilotComputeBase:
         self.metrics_file_name = os.path.join(self.pcs_working_directory, "metrics.csv")
         self.client = None
         self.logger = PilotComputeServiceLogger(self.pcs_working_directory)
+        
+        with open(self.metrics_file_name, 'a', newline='') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=SORTED_METRICS_FIELDS)
+            if csvfile.tell() == 0:
+                writer.writeheader()        
 
     def submit_task(self, func, *args, **kwargs):
         task_future = None
@@ -56,41 +75,34 @@ class PilotComputeBase:
                 raise PilotAPIException("Cluster client isn't ready/provisioned yet")
 
             self.logger.info(f"Running task {task_name} with details func:{func.__name__}")
-
-
-            metrics = {
-                'task_id': task_name,
-                'pilot_scheduled': pilot_scheduled,
-                'submit_time': datetime.now(),
-                'wait_time_secs': None, 
-                'staging_time_secs': 0,
-                'completion_time': None,            
-                'execution_ms': None,
-                'status': None,
-                'error_msg': None,
-            }
-
+            
+            task_metrics = copy(METRICS)
+            task_metrics["task_id"] = task_name
+            task_metrics["pilot_scheduled"] = pilot_scheduled
+            task_metrics["submit_time"] = datetime.now()
+            task_metrics["status"] = "RUNNING"
+            
+            
             def task_func(metrics_fn, *args, **kwargs):
-                metrics["wait_time_secs"] = (datetime.now()-metrics["submit_time"]).total_seconds()
+                task_metrics["wait_time_secs"] = (datetime.now()-task_metrics["submit_time"]).total_seconds()
                 
                 task_execution_start_time = time.time()
                 result = None
                 
                 try:
                     result = func(*args, **kwargs)
-                    metrics["status"] = "SUCCESS"
+                    task_metrics["status"] = "SUCCESS"
                 except Exception as e:
-                    metrics["status"] = "FAILED"
-                    metrics["error_msg"] = str(e)
+                    task_metrics["status"] = "FAILED"
+                    task_metrics["error_msg"] = str(e)
                     
 
-                metrics["completion_time"] = datetime.now()
-                metrics["execution_ms"] = time.time() - task_execution_start_time
+                task_metrics["completion_time"] = datetime.now()
+                task_metrics["execution_ms"] = time.time() - task_execution_start_time
 
                 with open(metrics_fn, 'a', newline='') as csvfile:
-                    fieldnames = ['task_id','pilot_scheduled','submit_time', 'wait_time_secs', 'staging_time_secs', 'completion_time', 'execution_ms', 'status', 'error_msg']
-                    writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-                    writer.writerow(metrics)
+                    writer = csv.DictWriter(csvfile, fieldnames=SORTED_METRICS_FIELDS)
+                    writer.writerow(task_metrics)
 
                 return result             
             
@@ -110,7 +122,8 @@ class PilotComputeBase:
                 args = [ray.put(arg) for arg in args]
                 kwargs = {key: ray.put(value) for key, value in kwargs.items()}
                 staging_end_time = time.time()
-                metrics["staging_time_secs"] = staging_end_time - staging_start_time
+                task_metrics["staging_time_secs"] = staging_end_time - staging_start_time
+                task_metrics["input_staging_data_size_bytes"] = sum([arg.size() for arg in args])
                 task_future = ray.remote(task_func).options(**resources).remote(self.metrics_file_name, *args, **kwargs)                    
         except Exception as e:
             self.logger.error(f"Error submitting task {task_name} with details func:{func.__name__} - {str(e)}")
@@ -159,12 +172,6 @@ class PilotComputeService(PilotComputeBase):
         self.pilots = {}
         self.client = None
 
-        with open(self.metrics_file_name, 'a', newline='') as csvfile:
-            fieldnames = ['task_id', 'pilot_scheduled', 'submit_time', 'wait_time_secs', 'staging_time_secs', 'completion_time',
-                          'execution_ms', 'status', 'error_msg']
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            if csvfile.tell() == 0:
-                writer.writeheader()
 
     def create_pilot(self, pilot_compute_description):
         pilot_name = pilot_compute_description.get("name", f"pilot-{uuid.uuid4()}")
