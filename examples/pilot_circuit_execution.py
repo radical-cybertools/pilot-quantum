@@ -2,6 +2,7 @@ import os
 import time
 from tracemalloc import start
 import numpy as np
+from zmq import device
 from qiskit.circuit.random import random_circuit
 from qiskit.quantum_info import SparsePauliOp
 from qiskit_aer import AerSimulator
@@ -21,12 +22,13 @@ from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 from qiskit_ibm_runtime import SamplerV2, Batch
 from qiskit_addon_cutting import reconstruct_expectation_values
 from qiskit_aer.primitives import EstimatorV2
+from qiskit.circuit.library import EfficientSU2
 
 
 
 
 
-RESOURCE_URL_HPC = "ssh://localhost"
+RESOURCE_URL_HPC = "slurm://localhost"
 WORKING_DIRECTORY = os.path.join(os.environ["HOME"], "work")
 
 pilot_compute_description_ray = {
@@ -51,17 +53,20 @@ def start_pilot(pilot_compute_description_ray):
     return pcs
 
 
-def pre_processing():    
-    base_qubuits = 7
-    scale = 1
-    circuit = random_circuit(base_qubuits *scale, 6, max_operands=2, seed=1242)
-    observable = SparsePauliOp(["ZIIIIII"*scale, "IIIZIII"*scale, "IIIIIII"*scale])
+def pre_processing(scale=1):    
+    base_qubuits = 8
+    # circuit = random_circuit(base_qubuits *scale, 6, max_operands=2, seed=1242)
+    # observable = SparsePauliOp(["ZIIIIIII"*scale, "IIIZIIII"*scale, "IIIIIIIZ"*scale])
+    
+    circuit = EfficientSU2(base_qubuits*scale, entanglement="linear", reps=2).decompose()
+    circuit.assign_parameters([0.4] * len(circuit.parameters), inplace=True)
+    observable = SparsePauliOp(["ZIIIIIII"*scale, "IIIZIIII"*scale, "IIIIIIIZ"*scale])    
 
     # Specify settings for the cut-finding optimizer
     optimization_settings = OptimizationParameters(seed=111)
 
     # Specify the size of the QPUs available
-    device_constraints = DeviceConstraints(qubits_per_subcircuit=4)
+    device_constraints = DeviceConstraints(qubits_per_subcircuit=2)
 
     cut_circuit, metadata = find_cuts(circuit, optimization_settings, device_constraints)
     print(
@@ -105,17 +110,17 @@ def execute_sampler(sampler, label, subsystem_subexpts, shots):
 
 if __name__ == "__main__":
     pcs = None
-    num_nodes = [1]
-    for nodes in num_nodes:
+    num_nodes = [4]
+    for scale in [4]:
         start_time = time.time()
         try:
             # Start Pilot
-            pilot_compute_description_ray["number_of_nodes"] = nodes
+            pilot_compute_description_ray["number_of_nodes"] = num_nodes[0]
             pcs = start_pilot(pilot_compute_description_ray)
             
-            subexperiments, coefficients, subobservables, observable, circuit = pre_processing()
+            subexperiments, coefficients, subobservables, observable, circuit = pre_processing(scale)
             
-            backend = AerSimulator()
+            backend = AerSimulator(device="GPU")
             print("*********************************** transpiling circuits ***********************************")
             # Transpile the subexperiments to ISA circuits
             pass_manager = generate_preset_pass_manager(optimization_level=1, backend=backend)
@@ -145,19 +150,22 @@ if __name__ == "__main__":
             for result in results_tuple:
                 results[result[0]] = result[1]
             
+            reconstruction_start_time = time.time()
             # Get expectation values for each observable term
             reconstructed_expvals = reconstruct_expectation_values(
                 results,
                 coefficients,
                 subobservables,
             )
-            
+            reconstruction_end_time = time.time()
+            print("Execution time for reconstruction: ", reconstruction_end_time-reconstruction_start_time)
+                        
             final_expval = np.dot(reconstructed_expvals, observable.coeffs)
+            print(f"Reconstructed expectation value: {np.real(np.round(final_expval, 8))}")
             
-            estimator = EstimatorV2()
-            full_circuit_transpilation = pass_manager.run(circuit)
             full_circuit_estimator_time = time.time()
-            exact_expval = estimator.run([(full_circuit_transpilation, observable)]).result()[0].data.evs
+            estimator = EstimatorV2()
+            exact_expval = estimator.run([(circuit, observable)]).result()[0].data.evs
             full_circuit_estimator_end_time = time.time()
             print("Execution time for full Circuit: ", full_circuit_estimator_end_time-full_circuit_estimator_time)
             
@@ -169,7 +177,9 @@ if __name__ == "__main__":
             )
 
             end_time = time.time()
-            print(f"Execution time for {nodes} nodes: {end_time-start_time}")                                           
+            print(f"Execution time for {num_nodes[0]} nodes: {end_time-start_time}")                                           
+        except Exception as e:
+            print(e)
         finally:
             if pcs:
                 pcs.cancel()
