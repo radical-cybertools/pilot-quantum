@@ -17,6 +17,12 @@ class DaskManager(PilotManager):
 
     def start_scheduler(self):
         # Stop any existing Dask workers
+        self._stop_existing_processes('bootstrap_dask')
+        
+        # Stop any existing Dask workers
+        self._stop_existing_processes('dask_v2.agent')
+        
+        # Stop any existing Dask workers
         self._stop_existing_processes('dask worker')
 
         # Stop any existing Dask schedulers
@@ -50,7 +56,7 @@ class DaskManager(PilotManager):
         
         # Write scheduler address to file
         scheduler_info = {
-            'address': scheduler_address
+            'agent_scheduler_address': scheduler_address
         }
         with open(self.scheduler_info_file, 'w') as f:
             json.dump(scheduler_info, f)
@@ -61,14 +67,27 @@ class DaskManager(PilotManager):
         return super().submit_pilot(pilot_compute_description)
 
     def _get_saga_job_arguments(self):
-        arguments = ["-m", "pilot.plugins.dask.bootstrap_dask", "-t", self.pilot_compute_description.get("type", "dask")]
-
-        arguments.extend(["-p", str(self.pilot_compute_description.get("cores_per_node", 1))])        
-        arguments.extend(["-s", "True"])
-        arguments.extend(["-f", self.scheduler_info_file])
-        arguments.extend(["-n", self.pilot_compute_description['name']])
-
-        return arguments
+        arguments = [ "-m", "pilot.plugins.dask_v2.agent",
+                     "-s", "True",
+                     "-w", self.pilot_working_directory,
+                     "-f", self.scheduler_info_file, 
+                     "-c", self.worker_config_file, 
+                     "-n", self.pilot_compute_description.get("name", "pq-dask-worker"),                     
+                     ]
+                     
+        
+        return arguments        
+    
+    def create_worker_config_file(self):
+        worker_config = {
+            'cores_per_node': str(self.pilot_compute_description.get("cores_per_node", "1")),
+            'gpus_per_node': str(self.pilot_compute_description.get("gpus_per_node", "1")),
+        }
+        with open(self.worker_config_file, 'w') as f:
+            json.dump(worker_config, f)
+            
+        self.logger.info(f"Worker config file created: {self.worker_config_file}")
+    
     
     def get_config_data(self):
         if not self.is_scheduler_started():
@@ -77,7 +96,7 @@ class DaskManager(PilotManager):
         
         # read the master json file and return the contents
         with open(self.scheduler_info_file, 'r') as f:
-            master_host = json.load(f)["address"]
+            master_host = json.load(f)["agent_scheduler_address"]
 
         master_host = urlparse(master_host).hostname
 
@@ -127,12 +146,26 @@ class DaskManager(PilotManager):
         super().cancel()
         self._stop_existing_processes('dask worker')
         self._stop_existing_processes('dask scheduler')
+        # Stop any existing Dask workers
+        self._stop_existing_processes('bootstrap_dask')        
+        # Stop any existing Dask workers
+        self._stop_existing_processes('dask_v2.agent')
+        
 
     def wait_tasks(self, tasks):
-        distributed.wait(tasks)
-
-        for task in tasks:
-            if task.done() and task.exception() is not None:                                
-                self.logger.info(f"Task {task} completed {task.status} with exception: {task.exception()}")
+        while True:
+            completed, not_completed = distributed.wait(tasks, return_when="FIRST_COMPLETED")
+            self.logger.info(f"Completed: {len(completed)}, Not Completed: {len(not_completed)}")
+            
+            if len(completed) > 0:
+                for future in completed:
+                    if future.exception():
+                        self.logger.error(f"Task failed: {future.exception()}")
+                        
+            if len(completed) == len(tasks):
+                break
+            
+            time.sleep(10)
+                    
 
         

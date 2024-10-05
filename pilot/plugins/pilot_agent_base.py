@@ -6,10 +6,11 @@ import hostlist
 
 
 class PilotAgent():
-    def __init__(self, working_directory, scheduler_file_path, worker_config_file):
+    def __init__(self, working_directory, scheduler_file_path, worker_config_file, worker_name="pq-worker"):
         self.working_directory = working_directory
         self.scheduler_file_path = scheduler_file_path
         self.worker_config_file = worker_config_file
+        self.worker_name = worker_name
         logging.basicConfig(filename='agent.log', level=logging.INFO)
         self.logger = logging.getLogger(__name__)
     

@@ -93,7 +93,9 @@ class RayManager(PilotManager):
                      "-s", "True",
                      "-w", self.pilot_working_directory,
                      "-f", self.scheduler_info_file, 
-                     "-c", self.worker_config_file ]
+                     "-c", self.worker_config_file, 
+                     "-n", self.pilot_compute_description.get("name", "pq-ray-worker"),                     
+                     ]
                      
         
         return arguments
@@ -101,7 +103,7 @@ class RayManager(PilotManager):
     def create_worker_config_file(self):
         worker_config = {
             'cores_per_node': str(self.pilot_compute_description.get("cores_per_node", "1")),
-            'gpus_per_node': str(self.pilot_compute_description.get("gpus_per_node", "1"))
+            'gpus_per_node': str(self.pilot_compute_description.get("gpus_per_node", "1")),
         }
         with open(self.worker_config_file, 'w') as f:
             json.dump(worker_config, f)
@@ -144,7 +146,7 @@ class RayManager(PilotManager):
             while completed < len(tasks):
                 ready, running_ids = ray.wait(running_ids, num_returns=1)
                 completed += len(ready)
-                self.logger.info(f"Tasks completed: {completed}, not ready: {len(running_ids)}")
+                self.logger.info(f"Tasks completed: {completed}, Pending: {len(running_ids)}")
         except Exception as e:
             self.logger.error(f"Error waiting for tasks: {e}")                
 

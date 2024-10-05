@@ -27,8 +27,8 @@ def handle_signals():
 
 class RayPilotAgent(PilotAgent):
 
-    def __init__(self, working_directory, scheduler_file_path, worker_config_file):
-        super().__init__(working_directory, scheduler_file_path, worker_config_file)
+    def __init__(self, working_directory, scheduler_file_path, worker_config_file, worker_name):
+        super().__init__(working_directory, scheduler_file_path, worker_config_file, worker_name)
         self.worker_nodes = self.get_nodelist_from_resourcemanager()
                   
 
@@ -72,6 +72,8 @@ if __name__ == "__main__" :
     parser.add_option("-f", "--scheduler-file", type="string", action="store", dest="scheduler_file", default="/Users/pmantha/work/pcs-2cebd082-52f0-4cf3-af71-2a89b82dcfd3/scheduler", help="Scheduler information file path")
         
     parser.add_option("-c", "--worker-config-file", type="string", action="store", dest="worker_config_file", default="/Users/pmantha/work/pcs-2cebd082-52f0-4cf3-af71-2a89b82dcfd3//worker_config.json", help="Worker config file")
+    
+    parser.add_option("-n", "--worker-name", type="string", action="store", dest="worker_name", default="pq-ray-worker", help="Worker name")
 
 
     
@@ -81,7 +83,7 @@ if __name__ == "__main__" :
     # Initialize object for managing Ray clusters
     ray_agent = RayPilotAgent(options.pilot_working_directory, 
                                  options.scheduler_file, 
-                                 options.worker_config_file)
+                                 options.worker_config_file, options.worker_name)
      
     if options.start:
         ray_agent.start_workers()

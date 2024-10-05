@@ -1,30 +1,24 @@
 import os
 import time
+from time import sleep
 from tracemalloc import start
+
 import numpy as np
 from qiskit.circuit.random import random_circuit
 from qiskit.quantum_info import SparsePauliOp
-from qiskit_aer import AerSimulator
-from pilot.pilot_compute_service import ExecutionEngine, PilotComputeService
-from time import sleep
-from qiskit_addon_cutting.automated_cut_finding import (
-    find_cuts,
-    OptimizationParameters,
-    DeviceConstraints,
-)
-
-from qiskit_addon_cutting import partition_problem
-from qiskit_addon_cutting import cut_wires, expand_observables
-
-from qiskit_addon_cutting import generate_cutting_experiments
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
-from qiskit_ibm_runtime import SamplerV2, Batch
-from qiskit_addon_cutting import reconstruct_expectation_values
+from qiskit_addon_cutting import (cut_wires, expand_observables,
+                                  generate_cutting_experiments,
+                                  partition_problem,
+                                  reconstruct_expectation_values)
+from qiskit_addon_cutting.automated_cut_finding import (DeviceConstraints,
+                                                        OptimizationParameters,
+                                                        find_cuts)
+from qiskit_aer import AerSimulator
 from qiskit_aer.primitives import EstimatorV2
+from qiskit_ibm_runtime import Batch, SamplerV2
 
-
-
-
+from pilot.pilot_compute_service import ExecutionEngine, PilotComputeService
 
 RESOURCE_URL_HPC = "ssh://localhost"
 WORKING_DIRECTORY = os.path.join(os.environ["HOME"], "work")
@@ -119,9 +113,11 @@ if __name__ == "__main__":
             print("*********************************** transpiling circuits ***********************************")
             # Transpile the subexperiments to ISA circuits
             pass_manager = generate_preset_pass_manager(optimization_level=1, backend=backend)
-            isa_subexperiments = {}
-            for label, partition_subexpts in subexperiments.items():
-                isa_subexperiments[label] = pass_manager.run(partition_subexpts)
+
+            isa_subexperiments = {
+                label: pass_manager.run(partition_subexpts)
+                for label, partition_subexpts in subexperiments.items()
+            }            
             print("*********************************** transpiling done ***********************************")
             
             tasks=[]
@@ -131,6 +127,7 @@ if __name__ == "__main__":
                 sampler = SamplerV2(mode=batch)
                 print(f"*********************************** len of subexperiments {len(isa_subexperiments)}*************************")
                 for label, subsystem_subexpts in isa_subexperiments.items():
+                    print(f"*********************************** len of subsystem_subexpts {len(subsystem_subexpts)}*************************")
                     task_future = pcs.submit_task(execute_sampler, sampler, label, subsystem_subexpts, shots=2**12, resources={'num_cpus': 1, 'num_gpus': 1, 'memory': None})
                     tasks.append(task_future)
                     i=i+1
@@ -159,8 +156,8 @@ if __name__ == "__main__":
             full_circuit_estimator_time = time.time()
             exact_expval = estimator.run([(full_circuit_transpilation, observable)]).result()[0].data.evs
             full_circuit_estimator_end_time = time.time()
-            print("Execution time for full Circuit: ", full_circuit_estimator_end_time-full_circuit_estimator_time)
             
+            print("Execution time for full Circuit: ", full_circuit_estimator_end_time-full_circuit_estimator_time)            
             print(f"Reconstructed expectation value: {np.real(np.round(final_expval, 8))}")
             print(f"Exact expectation value: {np.round(exact_expval, 8)}")
             print(f"Error in estimation: {np.real(np.round(final_expval-exact_expval, 8))}")

@@ -21,6 +21,7 @@ import os
 import time
 import uuid
 from datetime import datetime
+import threading
 
 
 METRICS = {
@@ -52,7 +53,7 @@ class PilotComputeBase:
         with open(self.metrics_file_name, 'a', newline='') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=SORTED_METRICS_FIELDS)
             if csvfile.tell() == 0:
-                writer.writeheader()        
+                writer.writeheader()   
 
     def submit_task(self, func, *args, **kwargs):
         task_future = None
@@ -67,14 +68,13 @@ class PilotComputeBase:
             if kwargs.get("task_name"):
                 del kwargs["task_name"]
 
-
             if not self.client:
                 self.client = self.get_client()
 
             if self.client is None:
                 raise PilotAPIException("Cluster client isn't ready/provisioned yet")
 
-            self.logger.info(f"Running task {task_name} with details func:{func.__name__}")
+            self.logger.info(f"Running task {task_name} on pilot {pilot_scheduled} with details func:{func.__name__}, args: {args}, kwargs: {kwargs}")
             
             task_metrics = copy(METRICS)
             task_metrics["task_id"] = task_name
@@ -100,9 +100,12 @@ class PilotComputeBase:
                 task_metrics["completion_time"] = datetime.now()
                 task_metrics["execution_ms"] = time.time() - task_execution_start_time
 
-                with open(metrics_fn, 'a', newline='') as csvfile:
-                    writer = csv.DictWriter(csvfile, fieldnames=SORTED_METRICS_FIELDS)
-                    writer.writerow(task_metrics)
+                lock = threading.Lock()
+                
+                with lock:
+                    with open(metrics_fn, 'a', newline='') as csvfile:
+                        writer = csv.DictWriter(csvfile, fieldnames=SORTED_METRICS_FIELDS)
+                        writer.writerow(task_metrics)
 
                 return result             
             
@@ -128,6 +131,8 @@ class PilotComputeBase:
         except Exception as e:
             self.logger.error(f"Error submitting task {task_name} with details func:{func.__name__} - {str(e)}")
             raise PilotAPIException(f"Error submitting task {task_name} with details func:{func.__name__} - {str(e)}")
+        
+        time.sleep(1)
         
         return task_future
     
