@@ -1,4 +1,6 @@
 import os
+
+from pilot.pilot_enums_exceptions import ExecutionEngine
 print("PYTHONPATH:", os.getenv('PYTHONPATH'))
 import sys
 import socket
@@ -114,7 +116,7 @@ def f(x):
 
 
 def start_pilot(pilot_compute_description):
-    pcs = PilotComputeService()
+    pcs = PilotComputeService(execution_engine=ExecutionEngine.RAY, working_directory=WORKING_DIRECTORY)
     dp = pcs.create_pilot(pilot_compute_description=pilot_compute_description)
     print("waiting for Ray pilot to start")
     dp.wait()

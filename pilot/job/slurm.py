@@ -148,7 +148,7 @@ class Job(object):
             print(tmpf_name)
             with os.fdopen(fd, 'w') as tmp:
                 tmp.write("#!/bin/bash\n")
-                tmp.write("#SBATCH -n %s\n" % str(self.pilot_compute_description["number_cores"]))
+                # tmp.write("#SBATCH -n %s\n" % str(self.pilot_compute_description["number_cores"]))
                 tmp.write("#SBATCH -N %s\n" % str(self.pilot_compute_description["number_of_nodes"]))
                 tmp.write("#SBATCH -J %s\n" % self.job_uuid_short)
                 tmp.write("#SBATCH -t %s\n" % str(self.pilot_compute_description["walltime_slurm"]))

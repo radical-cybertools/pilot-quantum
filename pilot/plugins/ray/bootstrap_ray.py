@@ -179,7 +179,7 @@ class RayBootstrap():
         
         self.ray_headnode_address = self.nodes[0]
         
-        conda_env = os.environ["CONDA_DEFAULT_ENV"]
+        conda_env = os.environ.get("CONDA_DEFAULT_ENV")
         if conda_env is not None or conda_env!="":
             cmd = """conda activate %s; \
                     ray stop; \
@@ -341,7 +341,7 @@ if __name__ == "__main__" :
 
 
     # print conda environment script is running in
-    print("Conda Environment: %s"%(os.environ["CONDA_DEFAULT_ENV"]))
+    print("Conda Environment: %s"%(os.environ.get("CONDA_DEFAULT_ENV")))
     # print python interpreter path
     print("Python Interpreter: %s"%(sys.executable))
 
