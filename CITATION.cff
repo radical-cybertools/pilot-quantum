@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "Mantha"
+  given-names: "Pradeep"
+  orcid: "https://orcid.org/0000-0003-2664-7737"
+- family-names: "Kiwit"
+  given-names: "Florian"
+  orcid: "https://orcid.org/0009-0000-4065-1535"
+- family-names: "Saurabh"
+  given-names: "Nishant"
+  orcid: "https://orcid.org/0000-0002-1926-4693"
+- family-names: "Shantenu"
+  given-names: "Jha"
+  orcid: "https://orcid.org/0000-0002-5040-026X"
+- family-names: "Mantha"
+  given-names: "Pradeep"
+  orcid: "https://orcid.org/0000-0002-1225-4062"
+title: "Pilot-Quantum"
+version: 0.1.0
+doi: 
+date-released: 2024-10-10
+url: "https://github.com/radical-cybertools/pilot-quantum"
