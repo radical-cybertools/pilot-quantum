@@ -38,12 +38,14 @@ METRICS = {
     'error_msg': None,
 }
 
-def run_mpi_task(num_procs, script_path):
+def run_mpi_task(num_procs, script_path, *args):
     """
-    Run an MPI script with the given number of processes.
+    Run an MPI script with the given number of processes and additional arguments.
     """
-    cmd = ["mpirun", "-np", str(num_procs), "python", script_path]
+    cmd = ["srun", "-n", str(num_procs), "python", script_path, *args]
     result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    print(f"stdout:\n{result.stdout}")
+    print(f"stderr:\n{result.stderr}")
     return result.stdout, result.stderr 
 
 SORTED_METRICS_FIELDS = sorted(METRICS.keys())
@@ -67,8 +69,8 @@ class PilotComputeBase:
     def get_logger(self):
         return self.logger       
     
-    def submit_mpi_task(self, num_procs, script_path):
-        return self.submit_task(run_mpi_task, num_procs, script_path)
+    def submit_mpi_task(self, script_path=None, num_procs=None, *args):
+        return self.submit_task(run_mpi_task, num_procs, script_path, *args)
         
     def submit_task(self, func, *args, **kwargs):
         task_future = None

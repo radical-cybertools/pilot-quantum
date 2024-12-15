@@ -30,10 +30,12 @@ class RayManager(PilotManager):
             raise RuntimeError(msg)
         else:
             self.logger.info("Ray scheduler stopped successfully.")
+                    
 
     def start_scheduler(self):
         # Stop existing Ray processes
         self.stop_ray()
+        self._stop_existing_processes("pilot.plugins.ray_v2.agent")
 
         # Start a new Dask scheduler in the background
         log_file = os.path.join(self.working_directory, 'ray_scheduler.log')
