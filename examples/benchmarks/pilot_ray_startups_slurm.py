@@ -11,14 +11,13 @@ WORKING_DIRECTORY = os.path.join(os.environ["HOME"], "work")
 pilot_compute_description_ray_cpu = {
     "resource": RESOURCE_URL_HPC,
     "working_directory": WORKING_DIRECTORY,
-    "number_of_nodes": 1,
-    "cores_per_node": 24,
+    "number_of_nodes": 2,
+    "cores_per_node": 64,
     "gpus_per_node": 0,
-    "queue": "debug",
+    "queue": "premium",
     "walltime": 30,
     "type": "ray",
     "project": "m4408",
-    "conda_environment": "/pscratch/sd/l/luckow/conda/pilot-quantum",
     "scheduler_script_commands": ["#SBATCH --constraint=cpu"]
 }
 

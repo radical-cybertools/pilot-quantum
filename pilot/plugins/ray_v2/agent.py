@@ -5,11 +5,14 @@ import signal
 import subprocess
 import time
 from optparse import OptionParser
+import concurrent.futures
 
 from pilot.plugins.pilot_agent_base import PilotAgent
 from pilot.util.ssh_utils import execute_local_process, execute_ssh_command, get_localhost
 
 STOP=False
+
+
 
 
 
@@ -25,6 +28,8 @@ def handle_signals():
     signal.signal(signal.SIGTERM, handler)
 
 
+
+
 class RayPilotAgent(PilotAgent):
 
     def __init__(self, working_directory, scheduler_file_path, worker_config_file, worker_name):
@@ -32,28 +37,33 @@ class RayPilotAgent(PilotAgent):
         self.worker_nodes = self.get_nodelist_from_resourcemanager()
                   
 
-    def start_workers(self):
-        for node in self.worker_nodes:                        
-            # read worker config file
-            worker_config = self.get_worker_config_json()
-            scheduler_address = self.get_scheduler_address()
-            
-            # Start Ray on the node
-            command = f"export RAY_ENABLE_WINDOWS_OR_OSX_CLUSTER=1; " \
-                      f"ray start --address {scheduler_address} " \
-                      f"--num-cpus={worker_config['cores_per_node']} " \
-                      f"--num-gpus={worker_config['gpus_per_node']}"
-                      
-
-                    
-            host_node_ip_address = get_localhost()
-            if scheduler_address.startswith(host_node_ip_address):
-                status = execute_local_process(command, working_directory=self.working_directory)
-            else:                    
-                status = execute_ssh_command(host=node, command=command, working_directory=self.working_directory)
-            
-            self.logger.info(f"Ray started on {node} with command {command} and status {status}")
+    def start_ray(self, node):
+        start_ray_time = time.time()
+        # read worker config file
+        worker_config = self.get_worker_config_json()
+        scheduler_address = self.get_scheduler_address()
         
+        # Start Ray on the node
+        command = f"export RAY_ENABLE_WINDOWS_OR_OSX_CLUSTER=1; " \
+                f"ray start --address {scheduler_address} " \
+                f"--num-cpus={worker_config['cores_per_node']} " \
+                f"--num-gpus={worker_config['gpus_per_node']}"                  
+            
+        host_node_ip_address = get_localhost()
+        if scheduler_address.startswith(host_node_ip_address):
+            status = execute_local_process(command, working_directory=self.working_directory)
+        else:                    
+            status = execute_ssh_command(host=node, command=command, working_directory=self.working_directory)
+            
+        end_ray_time = time.time()
+        current_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(end_ray_time))        
+        self.logger.info(f"Ray started on {node} with command {command} and status:{status};current_time:{current_time},startup_time:{end_ray_time-start_ray_time}")
+
+    def start_workers(self):                        
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            for node in self.worker_nodes:
+                executor.submit(self.start_ray, node)
+                
     def stop_workers(self):
         for node in self.worker_nodes:
             status = execute_ssh_command(node, "ray stop")

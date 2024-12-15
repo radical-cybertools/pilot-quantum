@@ -1,6 +1,7 @@
 from copy import copy
 import csv
 import logging
+import subprocess
 import time
 import uuid
 
@@ -32,10 +33,18 @@ METRICS = {
     'staging_time_secs': 0,
     'input_staging_data_size_bytes': 0,
     'completion_time': None,            
-    'execution_ms': None,
+    'execution_secs': None,
     'status': None,
     'error_msg': None,
 }
+
+def run_mpi_task(num_procs, script_path):
+    """
+    Run an MPI script with the given number of processes.
+    """
+    cmd = ["mpirun", "-np", str(num_procs), "python", script_path]
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    return result.stdout, result.stderr 
 
 SORTED_METRICS_FIELDS = sorted(METRICS.keys())
 
@@ -54,7 +63,13 @@ class PilotComputeBase:
             writer = csv.DictWriter(csvfile, fieldnames=SORTED_METRICS_FIELDS)
             if csvfile.tell() == 0:
                 writer.writeheader()   
-
+                
+    def get_logger(self):
+        return self.logger       
+    
+    def submit_mpi_task(self, num_procs, script_path):
+        return self.submit_task(run_mpi_task, num_procs, script_path)
+        
     def submit_task(self, func, *args, **kwargs):
         task_future = None
         try:
@@ -74,7 +89,7 @@ class PilotComputeBase:
             if self.client is None:
                 raise PilotAPIException("Cluster client isn't ready/provisioned yet")
 
-            self.logger.info(f"Running task {task_name} on pilot {pilot_scheduled} with details func:{func.__name__}, args: {args}, kwargs: {kwargs}")
+            self.logger.info(f"Running task {task_name} on pilot {pilot_scheduled} with details func:{func.__name__}")
             
             task_metrics = copy(METRICS)
             task_metrics["task_id"] = task_name
@@ -98,7 +113,7 @@ class PilotComputeBase:
                     
 
                 task_metrics["completion_time"] = datetime.now()
-                task_metrics["execution_ms"] = time.time() - task_execution_start_time
+                task_metrics["execution_secs"] = round((time.time() - task_execution_start_time), 4)
 
                 lock = threading.Lock()
                 
@@ -118,21 +133,20 @@ class PilotComputeBase:
                     task_future = self.client.submit(task_func, self.metrics_file_name, *args, **kwargs, workers=pilot_workers)
                 else:                
                     task_future = self.client.submit(task_func, self.metrics_file_name, *args, **kwargs)
+                    time.sleep(1)
             elif self.execution_engine == ExecutionEngine.RAY:
                 # Extract resource options from kwargs (if any)
                 resources = kwargs.pop('resources', {})
-                staging_start_time = time.time()
-                args = [ray.put(arg) for arg in args]
-                kwargs = {key: ray.put(value) for key, value in kwargs.items()}
-                staging_end_time = time.time()
-                task_metrics["staging_time_secs"] = staging_end_time - staging_start_time
-                task_metrics["input_staging_data_size_bytes"] = sum([arg.size() for arg in args])
+                # staging_start_time = time.time()
+                # args = [ray.put(arg) for arg in args]
+                # kwargs = {key: ray.put(value) for key, value in kwargs.items()}
+                # staging_end_time = time.time()
+                # task_metrics["staging_time_secs"] = staging_end_time - staging_start_time
+                # task_metrics["input_staging_data_size_bytes"] = sum([arg.size() for arg in args])
                 task_future = ray.remote(task_func).options(**resources).remote(self.metrics_file_name, *args, **kwargs)                    
         except Exception as e:
             self.logger.error(f"Error submitting task {task_name} with details func:{func.__name__} - {str(e)}")
             raise PilotAPIException(f"Error submitting task {task_name} with details func:{func.__name__} - {str(e)}")
-        
-        time.sleep(1)
         
         return task_future
     
@@ -170,15 +184,18 @@ class PilotComputeService(PilotComputeBase):
         self.logger.info(f"Initializing PilotComputeService with execution engine {execution_engine} and working directory {self.pcs_working_directory}")
         
         self.cluster_manager = self.__get_cluster_manager(execution_engine, self.pcs_working_directory)
-        self.cluster_manager.start_scheduler()
-
         
+        scheduler_start_time = time.time()
+        self.cluster_manager.start_scheduler()
+        scheduer_end_time = time.time()
+        self.logger.info(f"[Metrics]scheduler_startup_metric_secs:{scheduer_end_time - scheduler_start_time}")
         self.logger.info("PilotComputeService initialized.")
         self.pilots = {}
         self.client = None
 
 
     def create_pilot(self, pilot_compute_description):
+        pilot_submission_start_time = time.time()
         pilot_name = pilot_compute_description.get("name", f"pilot-{uuid.uuid4()}")
         pilot_compute_description["name"] = pilot_name
 
@@ -193,6 +210,8 @@ class PilotComputeService(PilotComputeBase):
         pilot = PilotCompute(batch_job, cluster_manager=self.cluster_manager)
 
         self.pilots[pilot_name] = pilot
+        pilot_submission_end_time = time.time()
+        self.logger.info(f"[Metrics]pilot_submission_metric_secs:{pilot_submission_end_time - pilot_submission_start_time}")
         return pilot
 
     def __get_cluster_manager(self, execution_engine, working_directory):
