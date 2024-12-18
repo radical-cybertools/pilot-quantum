@@ -15,6 +15,11 @@ Anaconda or Miniconda is the preferred distribution
 
 
 ## Installation
+
+Create environment with tool of your choice:
+
+    conda create -n pilot-quantum python=3.12
+
 Requirement (in case a manual installation is required):
 
 The best way to utilize Pilot-Quantum is Anaconda, which provides an easy way to install
@@ -24,6 +29,7 @@ The best way to utilize Pilot-Quantum is Anaconda, which provides an easy way to
 To install Pilot-Quantum type:
 
     python setup.py install
+
 
 
 ## Hints
