@@ -115,7 +115,7 @@ class PilotManager:
             pids = result.stdout.strip().split('\n')
             for pid in pids:
                 if pid:
-                    print(f"Stopping existing dask process with PID: {pid}")
+                    print(f"Stopping existing ray/dask process with PID: {pid}")
                     subprocess.run(['kill', '-9', pid])
         except Exception as e:
             print(f"Error stopping existing schedulers: {e}")

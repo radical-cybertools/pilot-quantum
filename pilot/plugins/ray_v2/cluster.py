@@ -37,7 +37,7 @@ class RayManager(PilotManager):
         self.stop_ray()
         self._stop_existing_processes("pilot.plugins.ray_v2.agent")
 
-        # Start a new Dask scheduler in the background
+        # Start a new Ray scheduler in the background
         log_file = os.path.join(self.working_directory, 'ray_scheduler.log')
         
         
