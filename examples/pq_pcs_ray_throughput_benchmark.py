@@ -49,13 +49,14 @@ if __name__ == "__main__":
         with open(startup_csv, 'a', newline='') as csvfile:
             writer = csv.writer(csvfile)
             if csvfile.tell() == 0:  # Write header if file is empty
-                writer.writerow(['Startup Time (s)', 'Nodes', 'Cores per Node'])
+                writer.writerow(['Startup Time (s)', 'Nodes', 'Cores per Node', 'Timestamp'])
             startup_time = end_time - start_time
             print(f"Pilot startup time: {startup_time:.2f}s with {pilot_compute_description_ray['number_of_nodes']} nodes and {pilot_compute_description_ray['cores_per_node']} cores per node")
             writer.writerow([
                 f"{startup_time:.2f}",
                 pilot_compute_description_ray['number_of_nodes'],
-                pilot_compute_description_ray['cores_per_node']
+                pilot_compute_description_ray['cores_per_node'],
+                time.strftime('%Y-%m-%d %H:%M:%S')
             ])
         
         ray_client = pcs.get_client()
@@ -67,7 +68,7 @@ if __name__ == "__main__":
         csv_filename = f"ray_benchmark_results_{pilot_compute_description_ray['number_of_nodes']}nodes_{pilot_compute_description_ray['cores_per_node']}cores.csv"
         with open(csv_filename, 'w', newline='') as csvfile:
             writer = csv.writer(csvfile)
-            writer.writerow(['Task Size', 'Duration (s)', 'Throughput (tasks/s)', 'Nodes', 'Cores per Node'])
+            writer.writerow(['Task Size', 'Duration (s)', 'Throughput (tasks/s)', 'Nodes', 'Cores per Node', 'Timestamp'])
 
             task_sizes = [1024, 2048, 4096, 8192]
             for size in task_sizes:
@@ -91,7 +92,8 @@ if __name__ == "__main__":
                         f"{duration:.2f}", 
                         f"{throughput:.2f}",
                         pilot_compute_description_ray['number_of_nodes'],
-                        pilot_compute_description_ray['cores_per_node']
+                        pilot_compute_description_ray['cores_per_node'],
+                        time.strftime('%Y-%m-%d %H:%M:%S')
                     ])
 
                
