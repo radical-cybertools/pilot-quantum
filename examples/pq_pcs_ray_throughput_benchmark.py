@@ -34,7 +34,7 @@ def start_pilot():
 def square(num):
     return num ** 2
 
-def sleep(num):
+def sleep(num=0):
     sleep(num)
     return num
 
@@ -76,8 +76,9 @@ if __name__ == "__main__":
                     start_time = time.time()
                     print(f"Run {run+1}: Submitting {size} tasks...")
                     for i in range(size):
-                        k = pcs.submit_task(sleep, i, resources={'num_cpus': 1, 'num_gpus': 0, 'memory': None})
+                        k = pcs.submit_task(sleep, 0, resources={'num_cpus': 1, 'num_gpus': 0, 'memory': None})
                         tasks.append(k)
+                    pcs.wait_tasks(tasks)
                     end_time = time.time()
                     duration = end_time - start_time
                     throughput = size / duration
@@ -93,7 +94,7 @@ if __name__ == "__main__":
                         pilot_compute_description_ray['cores_per_node']
                     ])
 
-                pcs.wait_tasks(tasks)
+               
                 #print(pcs.get_results(tasks))
         
        

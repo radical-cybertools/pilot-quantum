@@ -23,7 +23,7 @@ class PilotComputeServiceLogger:
     def __init__(self, pcs_working_directory):
         if not self._initialized:
             log_file = os.path.join(pcs_working_directory, "pilot-quantum.log")
-            log_level = logging.DEBUG
+            log_level = logging.ERROR
 
             self.logger = logging.getLogger(__name__)
             self.logger.setLevel(log_level)
