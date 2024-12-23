@@ -30,6 +30,47 @@ To install Pilot-Quantum type:
 
     python setup.py install
 
+## API Usage
+
+Here is a simple script that launches Pythonic functions as tasks on remote SLURM nodes using Pilot-Quantum framework.
+
+```
+
+from pilot.pilot_compute_service import ExecutionEngine, PilotComputeService
+
+pilot_compute_description = {
+    "resource": "slurm://localhost",
+    "working_directory": WORKING_DIRECTORY,
+    "number_of_nodes": 2,
+    "cores_per_node": 1,
+    "queue": "premium",
+    "walltime": 30,
+    "type": "ray",
+    "project": "sample",
+    "scheduler_script_commands": ["#SBATCH --constraint=cpu"]    
+}
+
+def pennylane_quantum_circuit():
+    # pennylane circuit definition...
+    pass
+    
+# Pilot-Creation
+pcs = PilotComputeService(execution_engine=ExecutionEngine.RAY, working_directory=WORKING_DIRECTORY)
+pcs.create_pilot(pilot_compute_description=pilot_compute_description_ray)
+
+# Task submission
+tasks = []
+for i in range(10):
+    k = pcs.submit_task(pennylane_quantum_circuit, i, resources={'num_cpus': 1, 'num_gpus': 0, 'memory': None})
+    tasks.append(k)
+
+# Wait for tasks to complete
+pcs.wait_tasks(tasks)
+
+# Terminate the pilot
+pcs.cancel()
+
+```
 
 
 ## Hints
