@@ -70,7 +70,7 @@ if __name__ == "__main__":
             writer = csv.writer(csvfile)
             writer.writerow(['Task Size', 'Duration (s)', 'Throughput (tasks/s)', 'Nodes', 'Cores per Node', 'Timestamp'])
 
-            task_sizes = [1024, 2048, 4096, 8192]
+            task_sizes = [128, 256, 512, 1024, 2048, 4096, 8192]
             for size in task_sizes:
                 for run in range(3):  # Repeat 3 times
                     tasks = []
