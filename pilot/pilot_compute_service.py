@@ -335,9 +335,4 @@ class PilotFuture:
     def __repr__(self):
         return f"PilotFuture({self._future})"
 
-    # Add additional methods or properties specific to your use case
-    def custom_method(self):
-        # Custom logic or functionality
-        pass
-
 
