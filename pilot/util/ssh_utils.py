@@ -1,9 +1,47 @@
+import socket
 import os, sys
 import time
 import subprocess
 
 
-def execute_ssh_command(host, user=None, command="/bin/date", arguments=None, working_directory=os.getcwd(),
+def get_localhost():
+    host_node_ip_address = "127.0.0.1"
+    try:
+        host_node_ip_address = socket.gethostbyname(socket.gethostname())
+    except:
+        print("Failed to get node IP address. Using default 127.0.0.1")  
+          
+    return host_node_ip_address
+
+
+def execute_local_process(command, working_directory=os.getcwd(), job_output=None, job_error=None) -> object:
+    """
+    Execute Local Process
+    :param command:
+    :param working_directory:
+    :param job_output:
+    :param job_error:
+    :return: True/False - Success or Failure
+    """
+    print("Execute Local Process : {0}".format(command))
+    process = subprocess.Popen(command, shell=True,
+                                cwd=working_directory,
+                                stdout=job_output,
+                                stderr=job_error)
+    # Check the status of the process
+    process_status = process.poll()
+    while process_status is None:
+        time.sleep(5)
+        process_status = process.poll()
+
+    if process_status==0:
+        print("Process started successfully")
+    else:
+        message = f"Failed to start Process. Return code: {process_status}"
+        print(message)
+        raise RuntimeError(message)
+
+def execute_ssh_command(host="localhost", user=None, command="/bin/date", arguments=None, working_directory=os.getcwd(),
                         job_output=None, job_error=None, keyfile=None) -> object:
     """
     Execute SSH Command
@@ -39,8 +77,7 @@ def execute_ssh_command(host, user=None, command="/bin/date", arguments=None, wo
         ssh_process = subprocess.Popen(ssh_command, shell=True,
                                        cwd=working_directory,
                                        stdout=job_output,
-                                       stderr=job_error,
-                                       close_fds=True)
+                                       stderr=job_error)
         if ssh_process.poll is not None:
             ssh_process.wait(240)
             return True
