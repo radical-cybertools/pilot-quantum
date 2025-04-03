@@ -13,16 +13,17 @@ class PilotComputeServiceLogger:
 
     _instance = None
 
-    def __new__(cls):
+    def __new__(cls, pcs_working_directory):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._initialized = False
+            cls._instance.pcs_working_directory = pcs_working_directory
         return cls._instance
 
-    def __init__(self):
+    def __init__(self, pcs_working_directory):
         if not self._initialized:
-            log_file = os.environ.get("PILOT_LOG_FILE", os.path.expanduser("~/pilot-quantum.log"))
-            log_level = logging.DEBUG
+            log_file = os.path.join(pcs_working_directory, "pilot-quantum.log")
+            log_level = logging.ERROR
 
             self.logger = logging.getLogger(__name__)
             self.logger.setLevel(log_level)
@@ -72,8 +73,9 @@ class PilotComputeServiceLogger:
 
 # Example usage:
 if __name__ == "__main__":
-    logger1 = PilotComputeServiceLogger()
-    logger2 = PilotComputeServiceLogger()
+    pcs_working_directory = "/path/to/pcs_working_directory"
+    logger1 = PilotComputeServiceLogger(pcs_working_directory)
+    logger2 = PilotComputeServiceLogger(pcs_working_directory)
 
     # Both logger1 and logger2 are the same instance
     print(logger1 is logger2)  # Output: True
