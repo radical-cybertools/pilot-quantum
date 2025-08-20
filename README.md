@@ -6,14 +6,6 @@ Last Updated: 08/19/2025
 
 Pilot-Quantum is a Quantum-HPC middleware framework designed to address the challenges of integrating quantum and classical computing resources. It focuses on managing heterogeneous resources, including diverse Quantum Processing Unit (QPU) modalities and various integration types with classical resources, such as accelerators.
 
-## Key Features
-
-- **Multi-Executor Support**: Qiskit, IBMQ, PennyLane, and AWS Braket executors
-- **Intelligent Resource Selection**: QDREAMER integration for optimal quantum backend selection
-- **Distributed Computing**: Ray and Dask support for scalable quantum computing
-- **Multi-Pilot Architecture**: Manage multiple quantum resources simultaneously
-- **Real-time Optimization**: PuLP-based resource optimization with queue monitoring
-- **Circuit Compatibility**: Automatic gate set and qubit count validation
  
 Requirements:
 
@@ -82,7 +74,16 @@ pcs.cancel()
 
 ## QDREAMER Integration
 
-Pilot-Quantum now includes QDREAMER (Quantum Resource Allocation and Management Engine) for intelligent resource selection:
+Pilot-Quantum now includes QDREAMER (Quantum Resource Allocation and Management Engine) for optimal resource selection:
+
+## Key Features
+
+- **Multi-Executor Support**: Qiskit, IBMQ, PennyLane, and AWS Braket executors
+- **Optimized Resource Selection**: QDREAMER integration for optimal quantum backend selection
+- **Distributed Computing**: Ray and Dask support for scalable quantum computing
+- **Multi-Pilot Architecture**: Manage multiple quantum resources simultaneously
+- **Real-time Optimization**: PuLP-based resource optimization with queue monitoring
+- **Circuit Compatibility**: Automatic gate set and qubit count validation
 
 ```python
 from pilot.pilot_compute_service import ExecutionEngine, PilotComputeService
@@ -117,9 +118,9 @@ See `examples/dreamer/` for comprehensive examples:
 
 ### Components
 - **Pilot Compute Service**: Core orchestration and pilot management
-- **QDREAMER**: Intelligent quantum resource selection engine
+- **QDREAMER**: Optimal quantum resource selection engine based on fidelity and resource availability
 - **Quantum Executors**: Backend-specific execution engines
-- **Resource Generator**: Quantum resource discovery and management
+- **Resource Generator utility**: Quantum resource discovery and management
 - **Worker Processes**: Distributed task execution
 
 ### Supported Executors
