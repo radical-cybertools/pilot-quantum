@@ -101,6 +101,25 @@ class PennylaneExecutor(BaseExecutor):
         except ImportError:
             return False
     
+    def get_available_resources(self) -> Dict[str, Any]:
+        """
+        Get available Pennylane resources.
+        
+        Returns:
+            Dictionary containing available device information
+        """
+        return {
+            'device_name': self.device_name,
+            'wires': self.wires,
+            'shots': self.shots,
+            'capabilities': {
+                'supports_backprop': True,
+                'supports_adjoint': True,
+                'supports_vjp': True,
+                'supports_jvp': True
+            }
+        }
+    
     def _get_device(self):
         """
         Get the Pennylane device based on executor configuration.

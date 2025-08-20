@@ -196,8 +196,9 @@ class OptimizedResourceSelector:
             for name, var in resource_vars.items():
                 if var.value() == 1:
                     selected_resource = suitable_resources[name]
+                    queue_util = queue_dynamics.get(name, 0.0) if queue_dynamics else 0.0
                     self.logger.info(f"[TASK:{task_id}] 🎯 Optimization selected: {name} (fidelity={selected_resource.fidelity:.3f}, "
-                                   f"queue={queue_dynamics.get(name, 0.0):.3f}, noise={selected_resource.noise_level:.3f})")
+                                   f"queue={queue_util:.3f}, noise={selected_resource.noise_level:.3f})")
                     return selected_resource
         
         self.logger.warning(f"[TASK:{task_id}] ⚠️ Optimization problem could not be solved optimally")
