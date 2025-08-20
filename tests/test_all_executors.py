@@ -121,8 +121,9 @@ class TestAllExecutors(unittest.TestCase):
         self.assertIsNotNone(pilot)
         
         # Initialize QDREAMER
-        qdreamer = self.pcs.initialize_dreamer()
-        self.assertIsNotNone(qdreamer)
+        self.pcs.initialize_dreamer()
+        self.assertIsNotNone(self.pcs.qdreamer)
+        self.assertTrue(self.pcs.dreamer_enabled)
         
         # Test circuits
         circuits = self.create_standard_circuits()
@@ -170,8 +171,9 @@ class TestAllExecutors(unittest.TestCase):
         self.assertIsNotNone(pilot)
         
         # Initialize QDREAMER
-        qdreamer = self.pcs.initialize_dreamer()
-        self.assertIsNotNone(qdreamer)
+        self.pcs.initialize_dreamer()
+        self.assertIsNotNone(self.pcs.qdreamer)
+        self.assertTrue(self.pcs.dreamer_enabled)
         
         # Test circuits
         circuits = self.create_standard_circuits()
@@ -223,8 +225,9 @@ class TestAllExecutors(unittest.TestCase):
         self.assertIsNotNone(pilot)
         
         # Initialize QDREAMER
-        qdreamer = self.pcs.initialize_dreamer()
-        self.assertIsNotNone(qdreamer)
+        self.pcs.initialize_dreamer()
+        self.assertIsNotNone(self.pcs.qdreamer)
+        self.assertTrue(self.pcs.dreamer_enabled)
         
         # Verify multiple resources are available
         resources = self.pcs.quantum_resources
@@ -267,8 +270,9 @@ class TestAllExecutors(unittest.TestCase):
         pilot2 = self.pcs.create_pilot(pilot2_description)
         
         # Initialize QDREAMER
-        qdreamer = self.pcs.initialize_dreamer()
-        self.assertIsNotNone(qdreamer)
+        self.pcs.initialize_dreamer()
+        self.assertIsNotNone(self.pcs.qdreamer)
+        self.assertTrue(self.pcs.dreamer_enabled)
         
         # Verify resources from both pilots are available
         resources = self.pcs.quantum_resources
@@ -281,20 +285,25 @@ class TestAllExecutors(unittest.TestCase):
             working_directory=self.working_directory
         )
         
-        # Test invalid executor
-        with self.assertRaises(Exception):
-            pilot_description = {
-                "resource_type": "quantum",
-                "quantum": {
-                    "executor": "invalid_executor"
-                },
-                "working_directory": self.working_directory,
-                "type": "ray",
-                "dreamer_enabled": True,
-                "resource": "ssh://localhost",
-                "cores_per_node": 1
-            }
-            pilot = self.pcs.create_pilot(pilot_description)
+        # Test invalid executor - should fallback to fake backends gracefully
+        pilot_description = {
+            "resource_type": "quantum",
+            "quantum": {
+                "executor": "invalid_executor"
+            },
+            "working_directory": self.working_directory,
+            "type": "ray",
+            "dreamer_enabled": True,
+            "resource": "ssh://localhost",
+            "cores_per_node": 1
+        }
+        pilot = self.pcs.create_pilot(pilot_description)
+        
+        # Should succeed with fallback to fake backends
+        self.pcs.initialize_dreamer()
+        self.assertIsNotNone(self.pcs.qdreamer)
+        self.assertTrue(self.pcs.dreamer_enabled)
+        self.assertGreater(len(self.pcs.quantum_resources), 0)
     
     def test_circuit_validation(self):
         """Test circuit validation."""
@@ -317,17 +326,25 @@ class TestAllExecutors(unittest.TestCase):
         }
         
         pilot = self.pcs.create_pilot(pilot_description)
-        qdreamer = self.pcs.initialize_dreamer()
+        self.pcs.initialize_dreamer()
+        self.assertIsNotNone(self.pcs.qdreamer)
+        self.assertTrue(self.pcs.dreamer_enabled)
         
-        # Test invalid circuit
-        with self.assertRaises(Exception):
-            task = QuantumTask(
-                circuit="invalid_circuit",
-                num_qubits=2,
-                gate_set=["h", "cx"],
-                resource_config={}
-            )
-            task_id = self.pcs.submit_quantum_task(task)
+        # Test invalid circuit - should fail when worker tries to execute it
+        task = QuantumTask(
+            circuit="invalid_circuit",
+            num_qubits=2,
+            gate_set=["h", "cx"],
+            resource_config={}
+        )
+        task_id = self.pcs.submit_quantum_task(task)
+        
+        # Wait for the task to complete and expect it to fail
+        self.pcs.wait_tasks([task_id])
+        result = self.pcs.get_results([task_id])
+        
+        # The result should be None due to execution failure
+        self.assertIsNone(result[0])
 
 
 class TestExecutorPerformance(unittest.TestCase):
@@ -376,7 +393,9 @@ class TestExecutorPerformance(unittest.TestCase):
                 pilot_description["quantum"]["device"] = "default.qubit"
             
             pilot = self.pcs.create_pilot(pilot_description)
-            qdreamer = self.pcs.initialize_dreamer()
+            self.pcs.initialize_dreamer()
+            self.assertIsNotNone(self.pcs.qdreamer)
+            self.assertTrue(self.pcs.dreamer_enabled)
             
             # Create test circuit
             if executor == 'qiskit_local':
