@@ -23,7 +23,9 @@ class PilotComputeServiceLogger:
     def __init__(self, pcs_working_directory):
         if not self._initialized:
             log_file = os.path.join(pcs_working_directory, "pilot-quantum.log")
-            log_level = logging.ERROR
+            # Allow log level to be configured via environment variable
+            log_level_str = os.environ.get('PILOT_LOG_LEVEL', 'INFO')
+            log_level = getattr(logging, log_level_str.upper(), logging.INFO)
 
             self.logger = logging.getLogger(__name__)
             self.logger.setLevel(log_level)
@@ -70,6 +72,15 @@ class PilotComputeServiceLogger:
     def debug(self, message):
         self.log(message, logging.DEBUG)
 
+    def set_level(self, level):
+        """Set the logging level for all handlers."""
+        if isinstance(level, str):
+            level = getattr(logging, level.upper(), logging.INFO)
+        
+        self.logger.setLevel(level)
+        for handler in self.logger.handlers:
+            handler.setLevel(level)
+
 
 # Example usage:
 if __name__ == "__main__":
@@ -82,3 +93,7 @@ if __name__ == "__main__":
 
     logger1.info("This is an info message")
     logger2.warning("This is a warning message")
+    
+    # Change log level dynamically
+    logger1.set_level("DEBUG")
+    logger1.debug("This debug message will now be visible")

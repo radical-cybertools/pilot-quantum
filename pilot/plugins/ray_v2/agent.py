@@ -50,6 +50,7 @@ class RayPilotAgent(PilotAgent):
                 f"--num-gpus={worker_config['gpus_per_node']}"                  
             
         host_node_ip_address = get_localhost()
+        self.logger.info(f"Starting Ray on {node} with command {command}")
         if scheduler_address.startswith(host_node_ip_address):
             status = execute_local_process(command, working_directory=self.working_directory)
         else:                    
