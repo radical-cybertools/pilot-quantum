@@ -36,7 +36,7 @@ class TestExecutorCompatibility(unittest.TestCase):
             return bell_state
         
         # Create Qiskit executor
-        qiskit_executor = QiskitExecutor({
+        qiskit_executor = QiskitExecutor("qiskit_test", {
             'backend': 'qasm_simulator',
             'shots': 1000
         })
@@ -76,7 +76,7 @@ class TestExecutorCompatibility(unittest.TestCase):
             return bell_state
         
         # Create PennyLane executor
-        pennylane_executor = PennylaneExecutor({
+        pennylane_executor = PennylaneExecutor("pennylane_test", {
             'device': 'default.qubit',
             'wires': 2,
             'shots': 1000
@@ -109,7 +109,7 @@ class TestExecutorCompatibility(unittest.TestCase):
             return bell_state  # Raw function, not QNode
         
         # Create Qiskit executor
-        qiskit_executor = QiskitExecutor({
+        qiskit_executor = QiskitExecutor("qiskit_raw_test", {
             'backend': 'qasm_simulator',
             'shots': 1000
         })
