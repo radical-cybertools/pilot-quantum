@@ -1,24 +1,11 @@
 #!/usr/bin/env python3
 """
-Pilot Quantum with QDREAMER - Framework Backends Example
-
-This example demonstrates using QDREAMER with Qiskit simulator executor
-and various framework-provided backends including:
-- Qiskit Aer simulator (high performance)
-- Qiskit BasicAer simulator (basic functionality)
-- Fake backends (IBM-like simulators with realistic noise)
-- Custom backends (user-defined simulators)
-
-The example shows how QDREAMER intelligently selects the best backend
-based on circuit requirements, fidelity needs, and queue status.
+Pilot Quantum with QDREAMER AER Simulator
 """
 
 import os
 import time
-import sys
-from typing import Dict, List
 
-import ray
 from pilot.dreamer import QuantumTask, TaskType
 from pilot.pilot_compute_service import ExecutionEngine, PilotComputeService
 from qiskit import QuantumCircuit
@@ -30,7 +17,12 @@ WORKING_DIRECTORY = os.path.join(os.environ["HOME"], "work")
 pilot_quantum_description = {
     "resource_type": "quantum",
     "quantum": {
-        "executor": "qiskit_local",  # Uses framework-provided Qiskit backends
+        "executor": "qiskit_local",  
+        "backend_options": {
+            "shots": 4096,
+            "device": "CPU",
+            "method": "statevector"
+        }
         # No custom_backends - will use framework defaults
     },
     "working_directory": WORKING_DIRECTORY,
@@ -123,8 +115,8 @@ def demonstrate_framework_backends():
         # Test different circuit complexities
         circuits = [
             ("Bell State", create_bell_state_circuit, 2, ["h", "cx", "measure"]),
-            ("GHZ State", create_ghz_state_circuit, 3, ["h", "cx", "measure"]),
-            ("QFT", create_quantum_fourier_transform_circuit, 4, ["h", "cx", "measure"])
+            # ("GHZ State", create_ghz_state_circuit, 3, ["h", "cx", "measure"]),
+            # ("QFT", create_quantum_fourier_transform_circuit, 4, ["h", "cx", "measure"])
         ]
         
         print(f"\n🔄 Testing different circuit complexities...")
@@ -132,12 +124,12 @@ def demonstrate_framework_backends():
         for circuit_name, circuit_func, num_qubits, gate_set in circuits:
             print(f"\n--- Testing {circuit_name} Circuit ---")
             
+            qc = circuit_func()
+            print(f"[Demonstrate Framework Backends] Qiskit circuit: {qc}")
             # Create quantum task
             qt = QuantumTask(
-                circuit=circuit_func,
-                num_qubits=num_qubits,
-                gate_set=gate_set,
-                resource_config={"num_qpus": 1, "num_gpus": 0, "memory": None}
+                circuit=[qc, qc],                
+                resource_config={"num_qpus": 1, "num_gpus": 0, "memory": None}                
             )
             
             print(f" Submitting {circuit_name} task...")
@@ -148,69 +140,9 @@ def demonstrate_framework_backends():
             pcs.wait_tasks([task_id])
             result = pcs.get_results([task_id])
             
-            print(f"✅ {circuit_name} task completed successfully!")
+            print(f"✅ {circuit_name} task completed successfully! with result: {result}")
             
-            # Small delay between tasks
-            time.sleep(1)
-        
-        # Test multiple tasks for load balancing
-        print(f"\n🔄 Testing load balancing with multiple Bell state tasks...")
-        
-        def simple_bell_circuit():
-            qc = QuantumCircuit(2, 2)
-            qc.h(0)
-            qc.cx(0, 1)
-            qc.measure([0, 1], [0, 1])
-            return qc
-        
-        tasks = []
-        for i in range(5):
-            qt = QuantumTask(
-                circuit=simple_bell_circuit,
-                num_qubits=2,
-                gate_set=["h", "cx", "measure"],
-                resource_config={"num_qpus": 1, "num_gpus": 0, "memory": None}
-            )
-            
-            print(f" Submitting Bell state task {i+1}/5...")
-            task_id = pcs.submit_quantum_task(qt)
-            tasks.append(task_id)
-            
-            # Small delay to see resource selection
-            time.sleep(0.5)
-        
-        # Wait for completion
-        print("⏳ Waiting for all Bell state tasks to complete...")
-        pcs.wait_tasks(tasks)
-        results = pcs.get_results(tasks)
-        
-        print(f"✅ All {len(tasks)} Bell state tasks completed successfully!")
-        
-        # Show final statistics
-        print("\n=== Load Balancing Results ===")
-        print("📊 Analyzing load balancing results...")
-        
-        # Check metrics file for resource distribution
-        metrics_file = pcs.metrics_file_name
-        if os.path.exists(metrics_file):
-            import csv
-            resource_counts = {}
-            with open(metrics_file, 'r') as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    resource = row.get('pilot_scheduled', 'unknown')
-                    resource_counts[resource] = resource_counts.get(resource, 0) + 1
-            
-            print("Resource distribution:")
-            total_tasks = sum(resource_counts.values())
-            for resource, count in resource_counts.items():
-                percentage = (count / total_tasks) * 100
-                print(f"  {resource}: {count} tasks ({percentage:.1f}%)")
-        
-        print(f"\n✅ SUCCESS: Framework backends demonstration completed!")
-        print(f"   - QDREAMER successfully selected appropriate backends")
-        print(f"   - Different circuit complexities were handled correctly")
-        print(f"   - Load balancing worked with framework-provided resources")
+
         
     except Exception as e:
         print(f"❌ Error during framework backends demo: {e}")
@@ -226,3 +158,4 @@ def demonstrate_framework_backends():
 if __name__ == "__main__":
     # Run the framework backends demonstration
     demonstrate_framework_backends()
+

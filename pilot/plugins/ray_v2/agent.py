@@ -9,6 +9,8 @@ import concurrent.futures
 
 from pilot.plugins.pilot_agent_base import PilotAgent
 from pilot.util.ssh_utils import execute_local_process, execute_ssh_command, get_localhost
+import json
+
 
 STOP=False
 
@@ -43,12 +45,29 @@ class RayPilotAgent(PilotAgent):
         worker_config = self.get_worker_config_json()
         scheduler_address = self.get_scheduler_address()
         
+        # Extract standard Ray resources and custom resources
+        num_cpus = int(worker_config.get('num_cpus', worker_config.get('cores_per_node', '1')))
+        num_gpus = int(worker_config.get('num_gpus', worker_config.get('gpus_per_node', '1')))
+        
+        # Build custom resources (excluding standard Ray resources)
+        custom_resources = {}
+        for key, value in worker_config.items():
+            if key not in ['num_cpus', 'cores_per_node', 'num_gpus', 'gpus_per_node']:
+                try:
+                    custom_resources[key] = int(value)
+                except (ValueError, TypeError):
+                    custom_resources[key] = value  # Keep as-is if not convertible
+        
         # Start Ray on the node
         command = f"export RAY_ENABLE_WINDOWS_OR_OSX_CLUSTER=1; " \
                 f"ray start --address {scheduler_address} " \
-                f"--num-cpus={worker_config['cores_per_node']} " \
-                f"--num-gpus={worker_config['gpus_per_node']}"                  
-            
+                f"--num-cpus={num_cpus} " \
+                f"--num-gpus={num_gpus}"
+        
+        # Add custom resources if any exist
+        if custom_resources:
+            command += f" --resources='{json.dumps(custom_resources)}'"
+        
         host_node_ip_address = get_localhost()
         self.logger.info(f"Starting Ray on {node} with command {command}")
         if scheduler_address.startswith(host_node_ip_address):

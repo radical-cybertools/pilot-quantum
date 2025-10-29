@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
 import logging
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('pilot.pcs_logger')
 
 class BaseExecutor(ABC):
     """Base class for all quantum executors."""
@@ -16,7 +16,7 @@ class BaseExecutor(ABC):
     def __init__(self, name: str, config: Dict[str, Any]):
         self.name = name
         self.config = config
-        self.logger = logging.getLogger(__name__)
+        self.logger = logging.getLogger('pilot.pcs_logger')
     
     @abstractmethod
     def execute_circuit(self, circuit, resource_name: str, **kwargs) -> Any:
@@ -65,3 +65,19 @@ class BaseExecutor(ABC):
         """
         # Default implementation - subclasses should override
         return True
+    
+    def calculate_execution_fidelity(self, circuit, result, expected_state=None):
+        """
+        Calculate the execution fidelity of a circuit by comparing actual vs expected results.
+        
+        Args:
+            circuit: The executed quantum circuit
+            result: The execution result from the backend
+            expected_state: Optional expected state vector for comparison
+            
+        Returns:
+            float: Execution fidelity (0.0 to 1.0), or None if calculation fails
+        """
+        # Default implementation - subclasses should override
+        self.logger.warning("Execution fidelity calculation not implemented for this executor")
+        return None

@@ -33,14 +33,14 @@ pilot_qiskit_description = {
         "executor": "qiskit_local"
     },
     "working_directory": WORKING_DIRECTORY,
-    "type": "ray"
+    "type": "ray",
 }
 
 # Pilot 2: IBMQ executor with specific fake backend
 pilot_ibmq_description = {
     "resource_type": "quantum",
     "quantum": {
-        "executor": "ibmq"
+        "executor": "ibmq",
     },
     "working_directory": WORKING_DIRECTORY,
     "type": "ray" 
@@ -121,8 +121,8 @@ def demonstrate_multi_pilot():
         pilot2_name = pcs.create_pilot(pilot_compute_description=pilot_ibmq_description)
         print(f"   ✅ Pilot 2 created: {pilot2_name}")
         
-        print("\n🧠 Initializing QDREAMER for intelligent resource selection...")
-        pcs.initialize_dreamer()  # Uses default high_fidelity config
+        print("\n🧠 Initializing QDREAMER for optimum resource selection...")
+        pcs.initialize_dreamer() 
         
         print("✅ Pilot Compute Service initialized successfully")
         
@@ -175,7 +175,7 @@ def demonstrate_multi_pilot():
                 circuit=circuit_func,
                 num_qubits=num_qubits,
                 gate_set=gate_set,
-                resource_config={"num_qpus": 1, "num_gpus": 0, "memory": None}
+                resource_config={"num_qpus": 1, "num_gpus": 0, "memory": None},
             )
             
             print(f" Submitting {circuit_name} task...")
@@ -184,6 +184,7 @@ def demonstrate_multi_pilot():
             print(f"⏳ Waiting for task completion...")
             pcs.wait_tasks([task_id])
             result = pcs.get_results([task_id])
+
             
             print(f"✅ {circuit_name} task completed successfully!")
         

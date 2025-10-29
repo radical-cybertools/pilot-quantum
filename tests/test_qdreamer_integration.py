@@ -17,7 +17,7 @@ from unittest.mock import Mock, patch, MagicMock
 from qiskit import QuantumCircuit
 
 from pilot.pilot_compute_service import PilotComputeService, ExecutionEngine
-from pilot.dreamer import Q_DREAMER, QuantumTask, QuantumResource, OptimizedResourceSelector
+from pilot.dreamer import Q_DREAMER, QuantumTask, QuantumResource, StrategySelector
 from pilot.util.quantum_resource_generator import QuantumResourceGenerator
 from pilot.executors.qiskit_executor import QiskitExecutor
 from pilot.executors.ibmq_executor import IBMQExecutor
@@ -94,7 +94,7 @@ class TestQDREAMERIntegration(unittest.TestCase):
         )
         
         self.assertEqual(task.num_qubits, 2)
-        self.assertTrue(callable(task.circuit))
+        self.assertTrue(callable(task.circuits))
 
     def test_quantum_resource_creation(self):
         """Test QuantumResource creation and properties."""
@@ -131,7 +131,7 @@ class TestQDREAMERIntegration(unittest.TestCase):
         )
         
         # Test resource selection
-        selector = OptimizedResourceSelector()
+        selector = StrategySelector()
         selected_resource = selector.optimize_resource_selection(task, resources, None, "test_task")
         
         self.assertIsNotNone(selected_resource)
@@ -247,19 +247,19 @@ class TestQDREAMERIntegration(unittest.TestCase):
         )
         
         # Test high fidelity mode
-        high_fidelity_selector = OptimizedResourceSelector("high_fidelity")
+        high_fidelity_selector = StrategySelector("high_fidelity")
         high_fidelity_resource = high_fidelity_selector.optimize_resource_selection(
             task, resources, None, "test_task"
         )
         
         # Test high speed mode
-        high_speed_selector = OptimizedResourceSelector("high_speed")
+        high_speed_selector = StrategySelector("high_speed")
         high_speed_resource = high_speed_selector.optimize_resource_selection(
             task, resources, None, "test_task"
         )
         
         # Test balanced mode
-        balanced_selector = OptimizedResourceSelector("balanced")
+        balanced_selector = StrategySelector("balanced")
         balanced_resource = balanced_selector.optimize_resource_selection(
             task, resources, None, "test_task"
         )
@@ -303,7 +303,7 @@ class TestQDREAMERIntegration(unittest.TestCase):
             resource_config={"num_qpus": 1}
         )
         
-        selector = OptimizedResourceSelector()
+        selector = StrategySelector()
         
         # Should handle empty resources gracefully and return None
         result = selector.optimize_resource_selection(task, {}, None, "test_task")
@@ -344,7 +344,7 @@ class TestQDREAMERPerformance(unittest.TestCase):
             resource_config={"num_qpus": 1}
         )
         
-        selector = OptimizedResourceSelector()
+        selector = StrategySelector()
         
         # Measure selection time
         start_time = time.time()

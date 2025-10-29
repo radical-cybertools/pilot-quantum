@@ -20,8 +20,8 @@ class QuantumExecutionService:
     
     def __init__(self):
         """Initialize the quantum execution service."""
-        self.logger = logging.getLogger(__name__)
-        self._executors: Dict[str, BaseQuantumExecutor] = {}
+        self.logger = logging.getLogger('pilot.pcs_logger')
+        self._executors: Dict[str, BaseExecutor] = {}
     
     def execute_circuit(self, quantum_task, resource, *args, **kwargs):
         """
@@ -46,13 +46,13 @@ class QuantumExecutionService:
             
             # Get or create executor
             executor = self._get_executor(executor_type, resource, task_id)
+
+            # # transpile the circuit
+            # transpile_circuit = executor.transpile_circuit(quantum_task.circuit, *args, **kwargs)
             
             # Execute circuit
             self.logger.info(f"[TASK:{task_id}] ⚡ Executing circuit on {resource.name}...")
-            result = executor.execute_circuit(quantum_task.circuit, *args, **kwargs)
-            
-            self.logger.info(f"[TASK:{task_id}] ✅ Circuit executed successfully using {executor_type} executor")
-            return result
+            return executor.execute_circuit(quantum_task.circuits, *args, **kwargs)            
             
         except Exception as e:
             self.logger.error(f"[TASK:{task_id}] ❌ Circuit execution failed: {str(e)}")

@@ -104,9 +104,10 @@ class RayManager(PilotManager):
 
     def create_worker_config_file(self):
         worker_config = {
-            'cores_per_node': str(self.pilot_compute_description.get("cores_per_node", "1")),
-            'gpus_per_node': str(self.pilot_compute_description.get("gpus_per_node", "1")),
-        }
+            'num_cpus': int(self.pilot_compute_description.get("cores_per_node", 1)),
+            'num_gpus': int(self.pilot_compute_description.get("gpus_per_node", 1)),
+            'QPU': int(self.pilot_compute_description.get("QPUs", 1)),
+        }                
         with open(self.worker_config_file, 'w') as f:
             json.dump(worker_config, f)
             

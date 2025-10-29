@@ -27,21 +27,28 @@ class PilotComputeServiceLogger:
             log_level_str = os.environ.get('PILOT_LOG_LEVEL', 'INFO')
             log_level = getattr(logging, log_level_str.upper(), logging.INFO)
 
-            self.logger = logging.getLogger(__name__)
+            # Use a specific logger name to avoid propagation issues
+            self.logger = logging.getLogger('pilot.pcs_logger')
             self.logger.setLevel(log_level)
-            formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+            
+            # Prevent propagation to root logger to avoid duplicates
+            self.logger.propagate = False
+            
+            # Only add handlers if they don't already exist
+            if not self.logger.handlers:
+                formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 
-            # Log to file
-            file_handler = logging.FileHandler(log_file)
-            file_handler.setLevel(log_level)
-            file_handler.setFormatter(formatter)
-            self.logger.addHandler(file_handler)
+                # Log to file
+                file_handler = logging.FileHandler(log_file)
+                file_handler.setLevel(log_level)
+                file_handler.setFormatter(formatter)
+                self.logger.addHandler(file_handler)
 
-            # Log to console
-            console_handler = logging.StreamHandler()
-            console_handler.setLevel(log_level)
-            console_handler.setFormatter(formatter)
-            self.logger.addHandler(console_handler)
+                # Log to console
+                console_handler = logging.StreamHandler()
+                console_handler.setLevel(log_level)
+                console_handler.setFormatter(formatter)
+                self.logger.addHandler(console_handler)
 
             self._initialized = True
 

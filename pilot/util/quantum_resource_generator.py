@@ -149,74 +149,35 @@ class QuantumResourceGenerator:
             )
             q_resources_map[q_resource.name] = config
         return q_resources_map
-    
-    def _get_qiskit_local_resources(self, config=None):
-        """Get Qiskit local simulator resources."""
-        resources = {}
+
+    def _get_qiskit_local_resources(self, config={}):
+        """
+        Use Qiskit AerSimulator as backend and return QuantumResource information.
+        """
+        try:
+            from qiskit_aer import AerSimulator
+        except ImportError:
+            raise RuntimeError("Qiskit AerSimulator not available. Install qiskit-aer package to use 'qiskit_local' resources.")
+
+        backend_options = config.get('backend_options', {}) if config else {}
         
-        # Check if custom backends are provided in config
-        if config and 'custom_backends' in config:
-            print(f"🔧 Creating custom quantum resources from configuration...")
-            for backend_name, backend_config in config['custom_backends'].items():
-                resources[backend_name] = QuantumResource(
-                    name=backend_name,
-                    qubit_count=backend_config['qubit_count'],
-                    gateset=['h', 'cx', 'x', 'z', 'measure'],  # Default gateset
-                    error_rate=backend_config['error_rate'],
-                    noise_level=backend_config['noise_level'],
-                    quantum_config=config
-                )
-                fidelity = 1 - backend_config['error_rate']
-                print(f"   ✅ {backend_name}: {backend_config['qubit_count']} qubits, "
-                      f"{fidelity:.1%} fidelity, queue_length={backend_config.get('queue_length', 0)}")
-            return resources
+        backend = AerSimulator(**backend_options)
+        name = f"aer_sim_{backend_options.get('method', 'statevector')}"
         
-        # Check if specific backends are requested
-        backend_names = config.get('backend') if config else None
+        # Default gateset for AerSimulator
+        qubit_count = getattr(backend.configuration(), 'num_qubits', 32)
+        error_rate = 0.0  # Simulators are noise-free by default
+        noise_level = 0.0  # Simulators are noise-free by default
         
-        # Default Qiskit local resources
-        all_resources = {
-            'qiskit_aer_simulator': QuantumResource(
-                name='qiskit_aer_simulator',
-                qubit_count=32,
-                gateset=['h', 'cx', 'x', 'z', 'measure', 'u1', 'u2', 'u3'],
-                error_rate=0.0,  # Perfect simulator
-                noise_level=0.0,
-                quantum_config=config or {}
-            ),
-            'qiskit_basicaer_simulator': QuantumResource(
-                name='qiskit_basicaer_simulator',
-                qubit_count=24,
-                gateset=['h', 'cx', 'x', 'z', 'measure'],
-                error_rate=0.0,
-                noise_level=0.0,
-                quantum_config=config or {}
-            )
-        }
+        resource = QuantumResource(
+            name=name,
+            qubit_count=qubit_count,
+            gateset=[],
+            error_rate=error_rate,
+            noise_level=noise_level,
+        )
+        return {name: resource}
         
-        # Filter based on requested backends
-        if backend_names:
-            for backend_name in backend_names:
-                for resource_name, resource in all_resources.items():
-                    if resource_name == backend_name or backend_name in resource_name:
-                        resources[resource_name] = resource
-            
-            # Log which backends were found
-            if resources:
-                found_backends = list(resources.keys())
-                print(f"✅ Found requested Qiskit backends: {found_backends}")
-                if len(found_backends) < len(backend_names):
-                    missing = [b for b in backend_names if not any(b in found for found in found_backends)]
-                    print(f"⚠️  Warning: Some requested Qiskit backends not found: {missing}")
-            else:
-                print(f"⚠️  Warning: No requested Qiskit backends {backend_names} found. Available: {list(all_resources.keys())}")
-                # Fall back to all available resources
-                resources = all_resources
-        else:
-            # Use all available resources
-            resources = all_resources
-        
-        return resources
     
     def _get_ibmq_resources(self, executor, config):
         """Get IBM Quantum resources."""

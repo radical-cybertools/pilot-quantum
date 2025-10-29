@@ -29,7 +29,7 @@ class PennylaneExecutor(BaseExecutor):
         self.wires = config.get('wires', 2) if config else 2
         self.shots = config.get('shots', None) if config else None
         self._device = None
-        self.logger = logging.getLogger(__name__)
+        self.logger = logging.getLogger('pilot.pcs_logger')
     
     def execute_circuit(self, circuit, *args, **kwargs):
         """

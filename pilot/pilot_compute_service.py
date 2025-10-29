@@ -15,6 +15,8 @@ from pilot.plugins.dask_v2 import cluster as dask_cluster_manager
 from pilot.plugins.ray_v2 import cluster as ray_cluster_manager
 # Use per-worker cached QDREAMER to avoid repeated initialization overhead
 from pilot.services.worker_qdreamer import quantum_execution_remote
+from pilot.dreamer import Q_DREAMER, DreamerStrategyType
+
 
 
 import os
@@ -42,6 +44,8 @@ METRICS = {
     'execution_secs': None,
     'status': None,
     'error_msg': None,
+    'fidelity': None,
+    'execution_fidelity': None,
 }
 
 def run_mpi_task(num_procs, script_path, *args):
@@ -110,8 +114,7 @@ class PilotComputeBase:
             task_metrics["task_id"] = task_name
             task_metrics["pilot_scheduled"] = pilot_scheduled
             task_metrics["submit_time"] = datetime.now()
-            task_metrics["status"] = "RUNNING"
-            
+            task_metrics["status"] = "RUNNING"            
             
             def task_func(metrics_fn, *args, **kwargs):
                 task_metrics["wait_time_secs"] = (datetime.now()-task_metrics["submit_time"]).total_seconds()
@@ -166,7 +169,7 @@ class PilotComputeBase:
         return task_future
     
 
-    def submit_quantum_task(self, quantum_task, *args, **kwargs):
+    def submit_quantum_task(self, quantum_task):
         """
         Submit a quantum task using QDREAMER to find the best quantum resource.
         Resource selection happens at the worker level for better scalability.
@@ -174,7 +177,6 @@ class PilotComputeBase:
         if self.dreamer_enabled and not self.qdreamer:
             raise PilotAPIException("QDREAMER not initialized. Call initialize_dreamer() after creating a quantum pilot.")
         
-        self.logger.info(f"Submitting quantum task qubits: {quantum_task.num_qubits}, gates: {quantum_task.gate_set}")
                 
         # Prepare data to pass to worker (quantum resources)
         quantum_resources = self.quantum_resources if hasattr(self, 'quantum_resources') else {}
@@ -182,9 +184,30 @@ class PilotComputeBase:
         # Submit the quantum execution function using Ray
         if self.execution_engine == ExecutionEngine.RAY:
             # Extract resource options from kwargs (if any)
-            resources = kwargs.pop('resources', {})
-            task_future = ray.remote(quantum_execution_remote).options(**resources).remote(
-                self.metrics_file_name, quantum_task, quantum_resources, *args, **kwargs
+            resources = quantum_task.resource_config if hasattr(quantum_task, 'resource_config') else {}
+            
+            # Wrap resources in Ray's expected format
+            ray_options = {}
+            
+            # Extract standard Ray resource options
+            num_cpus = resources.get('num_cpus', 1) if resources else 1
+            num_gpus = resources.get('num_gpus', 0) if resources else 0
+            memory = resources.get('memory', None) if resources else None
+            
+            # Add custom resources (excluding standard Ray resources)
+            if resources:
+                custom_resources = {k: v for k, v in resources.items() 
+                                  if k not in ['num_cpus', 'num_gpus', 'memory']}
+                if custom_resources:
+                    ray_options['resources'] = custom_resources
+            
+            task_future = ray.remote(quantum_execution_remote).options(
+                num_cpus=num_cpus, 
+                num_gpus=num_gpus,
+                memory=memory,
+                **ray_options
+            ).remote(
+                self.metrics_file_name, quantum_task, quantum_resources, quantum_task.args, quantum_task.kwargs
             )
         elif self.execution_engine == ExecutionEngine.DASK:
             task_future = self.client.submit(quantum_execution_remote, self.metrics_file_name, quantum_task, quantum_resources, *args, **kwargs)
@@ -265,13 +288,13 @@ class PilotComputeService(PilotComputeBase):
         # Initialize quantum resource generator
         self.qrg = QuantumResourceGenerator()    
 
-    def initialize_dreamer(self, qdreamer_config=None):
+    def initialize_dreamer(self, dreamer_strategy=None):
         """
         Initialize QDREAMER with quantum resources from all quantum pilots.
         
         Args:
-            qdreamer_config: QDREAMER configuration dict with optimization_mode. 
-                           Default: {"optimization_mode": "high_fidelity"}
+            dreamer_strategy: DreamerStrategyType enum value for resource selection strategy.
+                             Default: DreamerStrategyType.LEAST_ERROR_RATE
         """
                 
         # Collect quantum resources from all quantum pilots
@@ -313,10 +336,10 @@ class PilotComputeService(PilotComputeBase):
         
         self.logger.info(f"Total quantum resources found: {len(self.quantum_resources)}")
         
-        # Initialize QDREAMER with config
-        if qdreamer_config is None:
-            qdreamer_config = {"optimization_mode": "high_fidelity"}
-        self.qdreamer = Q_DREAMER(qdreamer_config, self.quantum_resources)
+        # Initialize QDREAMER with strategy
+        if dreamer_strategy is None:
+            dreamer_strategy = DreamerStrategyType.LEAST_ERROR_RATE
+        self.qdreamer = Q_DREAMER(self.quantum_resources, dreamer_strategy)
         
         self.dreamer_enabled = True
         
@@ -336,6 +359,7 @@ class PilotComputeService(PilotComputeBase):
                 pilot_compute_description["cores_per_node"] = 1
             if "number_of_nodes" not in pilot_compute_description:
                 pilot_compute_description["number_of_nodes"] = 1
+                            
 
         self.logger.info(f"Pilot submitting with resource: {pilot_compute_description['resource']}, \
                          cores_per_node: {pilot_compute_description['cores_per_node']},  \
@@ -447,8 +471,7 @@ class PilotCompute(PilotComputeBase):
         self.cluster_manager.wait()
 
     def wait_tasks(self, tasks):
-        wait(tasks)
-        
+        self.cluster_manager.wait_tasks(tasks)
 
     def get_context(self, configuration=None):
         """

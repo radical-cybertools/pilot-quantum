@@ -28,10 +28,9 @@ SORTED_METRICS_FIELDS = sorted(METRICS.keys())
 def _get_or_create_worker_qdreamer(quantum_resources):
     global _WORKER_QDREAMER
     if _WORKER_QDREAMER is None:
-        from pilot.dreamer import Q_DREAMER
-        # Create QDREAMER with default high_fidelity optimization
-        qdreamer_config = {"optimization_mode": "high_fidelity"}
-        _WORKER_QDREAMER = Q_DREAMER(qdreamer_config, quantum_resources)
+        from pilot.dreamer import Q_DREAMER, DreamerStrategyType
+        # Create QDREAMER with default least error rate strategy
+        _WORKER_QDREAMER = Q_DREAMER(quantum_resources, DreamerStrategyType.ROUND_ROBIN)
     return _WORKER_QDREAMER
 
 
@@ -49,12 +48,11 @@ def quantum_execution_remote(metrics_fn, quantum_task, quantum_resources, *args,
     task_metrics["submit_time"] = datetime.now()
     task_metrics["status"] = "RUNNING"
 
-    # Create task-specific logger with correlation ID
-    logger = logging.getLogger(__name__)
+    # Use centralized logger to avoid duplicate logging
+    logger = logging.getLogger('pilot.pcs_logger')
     
     # Log task start with correlation ID
     logger.info(f"[TASK:{task_id}] 🚀 Starting quantum task execution")
-    logger.info(f"[TASK:{task_id}] 📋 Task details: {quantum_task.num_qubits} qubits, gates: {quantum_task.gate_set}")
     
     task_execution_start_time = time.time()
     result = None
@@ -65,11 +63,10 @@ def quantum_execution_remote(metrics_fn, quantum_task, quantum_resources, *args,
         worker_qdreamer = _get_or_create_worker_qdreamer(quantum_resources)
 
         # Select best resource for this task
-        logger.info(f"[TASK:{task_id}] 🔍 QDREAMER selecting best resource for task: {quantum_task.num_qubits} qubits, gates: {quantum_task.gate_set}")
-        best_resource = worker_qdreamer.get_best_resource(quantum_task, task_id)
+        best_resource = worker_qdreamer.get_best_resource(quantum_task)
         if not best_resource:
             raise Exception(
-                f"No suitable quantum resource found for task with {quantum_task.num_qubits} qubits and gates {quantum_task.gate_set}"
+                f"No suitable quantum resource found for task with {quantum_task}"
             )
 
         task_metrics["pilot_scheduled"] = best_resource.name

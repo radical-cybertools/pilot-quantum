@@ -1,300 +1,140 @@
 """
 Qiskit Quantum Executor
 
-Handles execution of quantum circuits using Qiskit backends.
+Minimal implementation for executing quantum circuits using Qiskit SamplerV2.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Union
 from .base_executor import BaseExecutor
 
 
 class QiskitExecutor(BaseExecutor):
     """
-    Executor for Qiskit quantum circuits.
-    
-    Supports local Qiskit Aer simulators only.
-    Supports custom noise models based on resource parameters.
+    Minimal executor for Qiskit quantum circuits using SamplerV2.
     """
     
     def __init__(self, name: str, config: Dict[str, Any]):
-        """
-        Initialize Qiskit executor.
-        
-        Args:
-            name: Executor name
-            config: Configuration dictionary with backend settings
-        """
+        """Initialize Qiskit executor."""
         super().__init__(name, config)
-        self.backend_name = config.get('backend', 'qasm_simulator') if config else 'qasm_simulator'
         self.shots = config.get('shots', 1000) if config else 1000
-        
-        # Custom backend parameters for noise modeling
-        self.error_rate = config.get('error_rate', None)
-        self.noise_level = config.get('noise_level', None)
-        self.qubit_count = config.get('qubit_count', None)
-        
-        self._backend = None
-        self._is_custom_backend = False
+        self.backend_options = config.get('backend_options', {
+            'shots': self.shots,
+            'device': 'CPU',
+            'method': 'statevector'
+        })
+        print(f"[QiskitExecutor] Initialized with shots={self.shots}, backend_options={self.backend_options}")
     
-    def execute_circuit(self, circuit, *args, **kwargs):
+    def execute_circuit(self, circuits: List, *args, **kwargs):
         """
-        Execute a Qiskit circuit.
+        Execute list of quantum circuits using SamplerV2.
         
         Args:
-            circuit: Qiskit QuantumCircuit or circuit function
+            circuits: List of quantum circuits
             *args: Additional arguments
             **kwargs: Additional keyword arguments
             
         Returns:
-            Circuit execution result
+            SamplerV2 execution result
         """
-        try:
-            # Try to import Aer from qiskit_aer first (newer versions)
-            try:
-                from qiskit_aer import Aer
-            except ImportError:
-                # Fall back to importing from qiskit (older versions)
-                from qiskit import Aer
-            
-            # Get the circuit
-            if callable(circuit):
-                qiskit_circuit = circuit(*args, **kwargs)
-            else:
-                qiskit_circuit = circuit
-            
-            # Check if we have custom backend parameters
-            if self._has_custom_parameters():
-                # Use custom backend with noise model
-                return self._execute_with_custom_backend(qiskit_circuit)
-            else:
-                # Use standard backend approach
-                return self._execute_with_standard_backend(qiskit_circuit)
-            
-        except Exception as e:
-            raise Exception(f"Qiskit execution failed: {str(e)}")
-    
-    def _has_custom_parameters(self) -> bool:
-        """Check if we have custom backend parameters for noise modeling."""
-        return (self.error_rate is not None or 
-                self.noise_level is not None or 
-                self.qubit_count is not None)
-    
-    def _execute_with_custom_backend(self, qiskit_circuit):
-        """Execute circuit using custom backend with noise model."""
         try:
             from qiskit_aer import AerSimulator
-            from qiskit_aer.noise import NoiseModel, depolarizing_error
+            from qiskit_ibm_runtime import SamplerV2, Batch
+            import time
             
-            # Create noise model based on custom parameters
-            noise_model = self._create_noise_model()
+            print(f"[QiskitExecutor] Executing {len(circuits)} circuits")
             
-            # Create custom backend with noise
-            backend_options = {
-                'method': 'density_matrix',  # Use density matrix method for noise simulation
-                'noise_model': noise_model,
-                'shots': self.shots
-            }
+            # Create AerSimulator backend with configured options
+            submit_start = time.time()
+            backend = AerSimulator(**self.backend_options)
+            print(f"[QiskitExecutor] Created backend in {time.time() - submit_start:.4f}s: {backend}")
             
-            # Add qubit count if specified
-            if self.qubit_count is not None:
-                backend_options['n_qubits'] = self.qubit_count
-            
-            custom_backend = AerSimulator(**backend_options)
-            
-            # Execute circuit using the backend's run method (newer Qiskit API)
-            job = custom_backend.run(qiskit_circuit, shots=self.shots)
-            result = job.result()
-            
-            return result
+            # Execute using SamplerV2 with Batch
+            with Batch(backend=backend) as batch:
+                sampler = SamplerV2(mode=batch)
+                print(f"[QiskitExecutor] Submitting job")
+                job = sampler.run(circuits)
+                print(f"[QiskitExecutor] Job submitted, waiting for result...")
+                result = job.result()
+                print(f"[QiskitExecutor] Job completed successfully with result: {result}")
+
+            return self.get_transformed_results(result)
             
         except Exception as e:
-            raise Exception(f"Custom backend execution failed: {str(e)}")
-    
-    def _execute_with_standard_backend(self, qiskit_circuit):
-        """Execute circuit using standard backend approach."""
-        try:
-            # Try to import execute from qiskit.primitives first (newer versions)
-            try:
-                from qiskit.primitives import Sampler
-                use_sampler = True
-            except ImportError:
-                use_sampler = False
-            
-            # Try to import execute from qiskit (older versions)
-            if not use_sampler:
-                try:
-                    from qiskit import execute
-                    use_execute = True
-                except ImportError:
-                    use_execute = False
-            
-            # Execute circuit using appropriate method
-            if use_sampler:
-                # Use new Sampler API (Qiskit 1.0+)
-                sampler = Sampler()
-                # Sampler expects a sequence of circuits, so wrap in a list
-                job = sampler.run([qiskit_circuit], shots=self.shots)
-                result = job.result()
-            elif use_execute:
-                # Use old execute API (pre-Qiskit 1.0)
-                backend = self._get_backend()
-                job = execute(qiskit_circuit, backend, shots=self.shots)
-                result = job.result()
-            else:
-                # Fallback: use backend's run method directly
-                backend = self._get_backend()
-                job = backend.run(qiskit_circuit, shots=self.shots)
-                result = job.result()
-            
-            return result
-            
-        except Exception as e:
-            raise Exception(f"Standard backend execution failed: {str(e)}")
-    
-    def _create_noise_model(self):
-        """Create a noise model based on custom parameters."""
-        try:
-            from qiskit_aer.noise import NoiseModel, depolarizing_error
-            
-            noise_model = NoiseModel()
-            
-            # Add depolarizing error based on error_rate and noise_level
-            if self.error_rate is not None and self.error_rate > 0:
-                # Convert error rate to depolarizing error
-                # For single qubit gates
-                single_qubit_error = depolarizing_error(self.error_rate, 1)
-                noise_model.add_all_qubit_quantum_error(single_qubit_error, ['h', 'x', 'z'])
-                
-                # For two qubit gates (higher error rate)
-                two_qubit_error_rate = self.error_rate * 2  # Typically 2-qubit gates have higher error
-                two_qubit_error = depolarizing_error(two_qubit_error_rate, 2)
-                noise_model.add_all_qubit_quantum_error(two_qubit_error, ['cx'])
-            
-            # Add additional noise based on noise_level
-            if self.noise_level is not None and self.noise_level > 0:
-                # Convert noise_level to additional depolarizing error
-                additional_error_rate = self.noise_level * 0.1  # Scale noise_level to reasonable error rate
-                
-                # For single qubit gates
-                single_qubit_noise = depolarizing_error(additional_error_rate, 1)
-                noise_model.add_all_qubit_quantum_error(single_qubit_noise, ['h', 'x', 'z'])
-                
-                # For two qubit gates
-                two_qubit_noise = depolarizing_error(additional_error_rate * 2, 2)
-                noise_model.add_all_qubit_quantum_error(two_qubit_noise, ['cx'])
-            
-            return noise_model
-            
-        except Exception as e:
-            raise Exception(f"Failed to create noise model: {str(e)}")
-    
-    def get_available_resources(self) -> Dict[str, Any]:
-        """
-        Get information about the Qiskit backend.
-        
-        Returns:
-            Dictionary containing backend information
-        """
-        try:
-            if self._has_custom_parameters():
-                return {
-                    'name': f"custom_{self.backend_name}",
-                    'configuration': {
-                        'error_rate': self.error_rate,
-                        'noise_level': self.noise_level,
-                        'qubit_count': self.qubit_count,
-                        'shots': self.shots
-                    },
-                    'properties': None
-                }
-            else:
-                backend = self._get_backend()
-                return {
-                    'name': backend.name(),
-                    'configuration': backend.configuration().to_dict(),
-                    'properties': backend.properties().to_dict() if backend.properties() else None
-                }
-        except Exception:
-            return {
-                'name': self.backend_name,
-                'configuration': None,
-                'properties': None
-            }
-    
-    def is_available(self) -> bool:
-        """
-        Check if Qiskit is available.
-        
-        Returns:
-            True if Qiskit is available, False otherwise
-        """
-        try:
-            import qiskit
-            return True
-        except ImportError:
-            return False
-    
-    def _get_backend(self):
-        """
-        Get the Qiskit backend.
-        
-        Returns:
-            Qiskit backend instance
-        """
-        if self._backend is None:
-            # Try to import Aer from qiskit_aer first (newer versions)
-            try:
-                from qiskit_aer import Aer
-            except ImportError:
-                # Fall back to importing from qiskit (older versions)
-                from qiskit import Aer
-            
-            self._backend = Aer.get_backend(self.backend_name)
-        return self._backend
-    
-    def get_queue_lengths(self) -> Dict[str, float]:
-        """
-        Get current queue lengths for Qiskit backends.
-        
-        For local simulators, queue length is typically 0.0 (immediate execution).
-        For real hardware, this would query the actual backend queue status.
-        
-        Returns:
-            Dict mapping backend names to queue utilization (0.0 to 1.0)
-        """
-        # For local simulators, queue is always 0.0 (immediate execution)
-        # For real hardware, this would query IBMQ backend status
-        return {self.backend_name: 0.0}
-    
-    def get_backend_status(self, backend_name: str) -> Dict[str, Any]:
-        """
-        Get detailed status information for a Qiskit backend.
-        
-        Args:
-            backend_name: Name of the backend
-            
-        Returns:
-            Dict containing status information
-        """
-        if backend_name == self.backend_name:
-            return {
-                "name": backend_name,
-                "queue_length": 0.0,  # Local simulators have no queue
-                "status": "available",
-                "type": "simulator" if "simulator" in backend_name.lower() else "hardware"
-            }
-        else:
-            return {
-                "name": backend_name,
-                "queue_length": 0.0,
-                "status": "unknown"
-            }
+            print(f"[QiskitExecutor] ERROR: Execution failed - {str(e)}")
+            raise Exception(f"Qiskit execution failed: {str(e)}")
+
+    def get_transformed_results(self, result):
+        # Reconstruct the PrimitiveResult object to fix serialization issues with current Qiskit versions (at the time 1.3)
+        # see https://github.com/Qiskit/qiskit/issues/12787
+        from qiskit.primitives.containers import (
+            PrimitiveResult,
+            SamplerPubResult,
+            DataBin,
+            BitArray,
+        )
+        import copy
+        import numpy as np
+
+        # Override DataBin class to fix serialization issues
+        class CustomDataBin(DataBin):
+            def __setattr__(self, name, value):
+                super().__init__()
+                self.__dict__[name] = value
+
+        # Reconstruct the PrimitiveResult object to fix serialization issues
+        new_results = []
+        for pub_result in result:
+            # Deep copy the metadata
+            new_metadata = copy.deepcopy(pub_result.metadata)
+
+            # Access the DataBin object
+            data_bin = pub_result.data
+
+            # Reconstruct DataBin
+            new_data_bin_dict = {}
+
+            # Explicitly copy 'observable_measurements'
+            if hasattr(data_bin, "observable_measurements"):
+                observable_measurements = data_bin.observable_measurements
+                new_observable_array = np.copy(observable_measurements.array)
+                new_observable_bitarray = BitArray(
+                    new_observable_array, observable_measurements.num_bits
+                )
+                new_data_bin_dict["observable_measurements"] = new_observable_bitarray
+
+            # Explicitly copy 'qpd_measurements'
+            if hasattr(data_bin, "qpd_measurements"):
+                qpd_measurements = data_bin.qpd_measurements
+                new_qpd_array = np.copy(qpd_measurements.array)
+                new_qpd_bitarray = BitArray(new_qpd_array, qpd_measurements.num_bits)
+                new_data_bin_dict["qpd_measurements"] = new_qpd_bitarray
+
+            # Copy other attributes of DataBin (e.g., 'shape')
+            if hasattr(data_bin, "shape"):
+                new_data_bin_dict["shape"] = copy.deepcopy(data_bin.shape)
+
+            # Create a new DataBin instance
+            new_data_bin = CustomDataBin(**new_data_bin_dict)
+            # new_data_bin.__setattr__ = custom_setattr
+
+            # Create a new SamplerPubResult
+            new_pub_result = SamplerPubResult(data=new_data_bin, metadata=new_metadata)
+            new_results.append(new_pub_result)
+
+        # Create a new PrimitiveResult
+        new_result = PrimitiveResult(
+            new_results, metadata=copy.deepcopy(result.metadata)
+        )             
+        return new_result        
     
     def is_simulator(self) -> bool:
-        """
-        Check if this executor uses simulators.
-        
-        Returns:
-            True - QiskitExecutor is for local simulators only
-        """
+        """Check if this executor uses simulators."""
         return True
+    
+    def get_available_resources(self) -> Dict[str, Any]:
+        """Get basic resource information."""
+        return {
+            'name': 'qiskit_aer_simulator',
+            'shots': self.shots,
+            'type': 'simulator'
+        }
