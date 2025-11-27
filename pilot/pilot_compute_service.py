@@ -8,10 +8,16 @@ import uuid
 from distributed import Future
 import ray
 
+from pilot.dreamer import Q_DREAMER, TaskType
 from pilot.pilot_enums_exceptions import ExecutionEngine, PilotAPIException
 from pilot.pcs_logger import PilotComputeServiceLogger
 from pilot.plugins.dask_v2 import cluster as dask_cluster_manager
 from pilot.plugins.ray_v2 import cluster as ray_cluster_manager
+# Use per-worker cached QDREAMER to avoid repeated initialization overhead
+from pilot.services.worker_qdreamer import quantum_execution_remote
+from pilot.dreamer import Q_DREAMER, DreamerStrategyType
+
+
 
 import os
 from dask.distributed import wait
@@ -23,6 +29,8 @@ import time
 import uuid
 from datetime import datetime
 import threading
+
+from pilot.util.quantum_resource_generator import QuantumResourceGenerator
 
 
 METRICS = {
@@ -36,6 +44,8 @@ METRICS = {
     'execution_secs': None,
     'status': None,
     'error_msg': None,
+    'fidelity': None,
+    'execution_fidelity': None,
 }
 
 def run_mpi_task(num_procs, script_path, *args):
@@ -71,9 +81,16 @@ class PilotComputeBase:
     
     def submit_mpi_task(self, script_path=None, num_procs=None, *args):
         return self.submit_task(run_mpi_task, num_procs, script_path, *args)
+            
         
     def submit_task(self, func, *args, **kwargs):
+        # Check if this is a quantum task
+        if hasattr(func, 'type') and func.type == TaskType.QUANTUM:
+            return self.submit_quantum_task(func, *args, **kwargs)
+        
+        # Continue with existing classical task logic
         task_future = None
+        
         try:
             pilot_scheduled = 'ANY'
             
@@ -91,14 +108,13 @@ class PilotComputeBase:
             if self.client is None:
                 raise PilotAPIException("Cluster client isn't ready/provisioned yet")
 
-            self.logger.info(f"Running task {task_name} on pilot {pilot_scheduled} with details func:{func.__name__}")
+            self.logger.info(f"Running classical task {task_name} on pilot {pilot_scheduled} with details func:{func.__name__}")
             
             task_metrics = copy(METRICS)
             task_metrics["task_id"] = task_name
             task_metrics["pilot_scheduled"] = pilot_scheduled
             task_metrics["submit_time"] = datetime.now()
-            task_metrics["status"] = "RUNNING"
-            
+            task_metrics["status"] = "RUNNING"            
             
             def task_func(metrics_fn, *args, **kwargs):
                 task_metrics["wait_time_secs"] = (datetime.now()-task_metrics["submit_time"]).total_seconds()
@@ -153,6 +169,53 @@ class PilotComputeBase:
         return task_future
     
 
+    def submit_quantum_task(self, quantum_task):
+        """
+        Submit a quantum task using QDREAMER to find the best quantum resource.
+        Resource selection happens at the worker level for better scalability.
+        """
+        if self.dreamer_enabled and not self.qdreamer:
+            raise PilotAPIException("QDREAMER not initialized. Call initialize_dreamer() after creating a quantum pilot.")
+        
+                
+        # Prepare data to pass to worker (quantum resources)
+        quantum_resources = self.quantum_resources if hasattr(self, 'quantum_resources') else {}
+        
+        # Submit the quantum execution function using Ray
+        if self.execution_engine == ExecutionEngine.RAY:
+            # Extract resource options from kwargs (if any)
+            resources = quantum_task.resource_config if hasattr(quantum_task, 'resource_config') else {}
+            
+            # Wrap resources in Ray's expected format
+            ray_options = {}
+            
+            # Extract standard Ray resource options
+            num_cpus = resources.get('num_cpus', 1) if resources else 1
+            num_gpus = resources.get('num_gpus', 0) if resources else 0
+            memory = resources.get('memory', None) if resources else None
+            
+            # Add custom resources (excluding standard Ray resources)
+            if resources:
+                custom_resources = {k: v for k, v in resources.items() 
+                                  if k not in ['num_cpus', 'num_gpus', 'memory']}
+                if custom_resources:
+                    ray_options['resources'] = custom_resources
+            
+            task_future = ray.remote(quantum_execution_remote).options(
+                num_cpus=num_cpus, 
+                num_gpus=num_gpus,
+                memory=memory,
+                **ray_options
+            ).remote(
+                self.metrics_file_name, quantum_task, quantum_resources, quantum_task.args, quantum_task.kwargs
+            )
+        elif self.execution_engine == ExecutionEngine.DASK:
+            task_future = self.client.submit(quantum_execution_remote, self.metrics_file_name, quantum_task, quantum_resources, *args, **kwargs)
+        else:
+            raise PilotAPIException(f"Unsupported execution engine for quantum tasks: {self.execution_engine}")
+        
+        return task_future
+
 
     def task(self, func):
         def wrapper(*args, **kwargs):
@@ -172,10 +235,34 @@ class PilotComputeBase:
         return wrapper_func(*args, **kwargs).result()
     
     def wait_tasks(self, tasks):
-        self.cluster_manager.wait_tasks(tasks)
+        """Wait for both classical and quantum tasks to complete."""
+        for task in tasks:
+            try:
+                if hasattr(task, 'result'):
+                    # Dask future
+                    task.result()
+                else:
+                    # Ray future
+                    ray.get(task)
+            except Exception as e:
+                self.logger.error(f"Error waiting for task: {str(e)}")
 
     def get_results(self, tasks):
-        return self.cluster_manager.get_results(tasks)    
+        """Get results from both classical and quantum tasks."""
+        results = []
+        for task in tasks:
+            try:
+                if hasattr(task, 'result'):
+                    result = task.result()
+                    results.append(result)
+                else:
+                    # Handle Ray futures
+                    result = ray.get(task)
+                    results.append(result)
+            except Exception as e:
+                self.logger.error(f"Error getting result from task: {str(e)}")
+                results.append(None)
+        return results    
 
 
 class PilotComputeService(PilotComputeBase):
@@ -184,7 +271,7 @@ class PilotComputeService(PilotComputeBase):
         self.pcs_working_directory = f"{working_directory}/pcs-{uuid.uuid4()}"                
         super().__init__(self.execution_engine, self.pcs_working_directory)
         self.logger.info(f"Initializing PilotComputeService with execution engine {execution_engine} and working directory {self.pcs_working_directory}")
-        
+
         self.cluster_manager = self.__get_cluster_manager(execution_engine, self.pcs_working_directory)
         
         scheduler_start_time = time.time()
@@ -194,11 +281,91 @@ class PilotComputeService(PilotComputeBase):
         self.logger.info("PilotComputeService initialized.")
         self.pilots = {}
         self.client = None
+        self.qdreamer = None
+        self.qrg = None
+        self.quantum_resources = {}
+        self.dreamer_enabled = False
+        # Initialize quantum resource generator
+        self.qrg = QuantumResourceGenerator()    
+
+    def initialize_dreamer(self, dreamer_strategy=None):
+        """
+        Initialize QDREAMER with quantum resources from all quantum pilots.
+        
+        Args:
+            dreamer_strategy: DreamerStrategyType enum value for resource selection strategy.
+                             Default: DreamerStrategyType.LEAST_ERROR_RATE
+        """
+                
+        # Collect quantum resources from all quantum pilots
+        self.quantum_resources = {}
+        
+        # Find all quantum pilots
+        quantum_pilots = [name for name, pilot in self.pilots.items() 
+                        if hasattr(pilot, 'pilot_compute_description') and 
+                        pilot.pilot_compute_description.get('resource_type') == 'quantum']
+        
+        if not quantum_pilots:
+            raise PilotAPIException("No quantum pilot found. Create a quantum pilot first.")
+        
+        self.logger.info(f"Initializing QDREAMER for {len(quantum_pilots)} quantum pilots")
+        
+        # Collect resources from all quantum pilots
+        for pilot_name in quantum_pilots:
+            pilot = self.pilots[pilot_name]
+            pilot_desc = pilot.pilot_compute_description
+            quantum_config = pilot_desc.get('quantum', {})
+            
+            if not quantum_config:
+                continue
+                
+            self.logger.info(f"Collecting resources from pilot {pilot_name}")
+            
+            # Handle primary executor
+            primary_executor = quantum_config.get('executor', 'qiskit_local')
+            primary_resources = self.qrg.get_quantum_resources_for_executor(primary_executor, quantum_config)
+            
+            # Add pilot name prefix to resource names to avoid conflicts
+            for resource_name, resource in primary_resources.items():
+                prefixed_name = f"{pilot_name}_{resource_name}"
+                self.quantum_resources[prefixed_name] = resource
+                resource.name = prefixed_name
+                    
+        if not self.quantum_resources:
+            raise PilotAPIException(f"No quantum resources found for any pilot")
+        
+        self.logger.info(f"Total quantum resources found: {len(self.quantum_resources)}")
+        
+        # Initialize QDREAMER with strategy
+        if dreamer_strategy is None:
+            dreamer_strategy = DreamerStrategyType.LEAST_ERROR_RATE
+        self.qdreamer = Q_DREAMER(self.quantum_resources, dreamer_strategy)
+        
+        self.dreamer_enabled = True
+        
+        self.logger.info(f"QDREAMER initialized successfully with {len(self.quantum_resources)} resources")
+        self.logger.info("Background queue monitoring started")
+
 
 
     def create_pilot(self, pilot_compute_description):
         pilot_submission_start_time = time.time()
         pilot_name = pilot_compute_description.get("name", f"pilot-{uuid.uuid4()}")
+        if 'resource_type' in pilot_compute_description and pilot_compute_description['resource_type'] == "quantum":
+            self.logger.info(f"Quantum resource found in pilot compute description")
+            if "resource" not in pilot_compute_description:
+                pilot_compute_description["resource"] = "ssh://localhost"
+            if "cores_per_node" not in pilot_compute_description:
+                pilot_compute_description["cores_per_node"] = 1
+            if "number_of_nodes" not in pilot_compute_description:
+                pilot_compute_description["number_of_nodes"] = 1
+                            
+
+        self.logger.info(f"Pilot submitting with resource: {pilot_compute_description['resource']}, \
+                         cores_per_node: {pilot_compute_description['cores_per_node']},  \
+                         number_of_nodes: {pilot_compute_description['number_of_nodes']}")
+
+       
         pilot_compute_description["name"] = pilot_name
 
         self.logger.info(f"Create Pilot with description {pilot_compute_description}")
@@ -210,6 +377,9 @@ class PilotComputeService(PilotComputeBase):
         details = self.cluster_manager.get_config_data()
         self.logger.info(f"Cluster details: {details}")
         pilot = PilotCompute(batch_job, cluster_manager=self.cluster_manager)
+        
+        # Store the pilot compute description for later use
+        pilot.pilot_compute_description = pilot_compute_description
 
         self.pilots[pilot_name] = pilot
         pilot_submission_end_time = time.time()
@@ -248,6 +418,12 @@ class PilotComputeService(PilotComputeBase):
         Result of the operation.
         """
         self.logger.info("Cancelling PilotComputeService.")
+        
+        # Stop background monitoring
+        if self.qdreamer:
+            # Background monitoring cleanup is handled in Q_DREAMER destructor
+            self.logger.info("Stopped background queue monitoring")
+        
         self.cluster_manager.cancel()
         self.logger.info("Terminating scheduler ....")
 
@@ -295,8 +471,7 @@ class PilotCompute(PilotComputeBase):
         self.cluster_manager.wait()
 
     def wait_tasks(self, tasks):
-        wait(tasks)
-        
+        self.cluster_manager.wait_tasks(tasks)
 
     def get_context(self, configuration=None):
         """

@@ -12,7 +12,7 @@ class PilotAgent():
         self.worker_config_file = worker_config_file
         self.worker_name = worker_name
         logging.basicConfig(filename='agent.log', level=logging.INFO)
-        self.logger = logging.getLogger(__name__)
+        self.logger = logging.getLogger('pilot.pcs_logger')
     
     def get_expanded_hostlist(self, hosts):
         return hostlist.expand_hostlist(hosts)

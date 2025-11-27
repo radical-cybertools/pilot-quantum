@@ -6,3 +6,11 @@ ray[all]~=2.40.0
 argparse~=1.4.0
 asyncssh==2.16.0
 pennylane~=0.37.0
+qiskit~=1.0.0
+qiskit-ibm-runtime~=0.20.0
+qiskit-aer~=0.13.0
+amazon-braket-sdk~=1.50.0
+pennylane-lightning~=0.37.0
+pennylane-qiskit~=0.37.0
+pennylane-forest~=0.37.0
+pulp>=2.7.0

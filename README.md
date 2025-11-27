@@ -1,10 +1,11 @@
 # Pilot-Quantum
 
-Last Updated: 10/09/2024
+Last Updated: 08/19/2025
 
 # Overview:
 
-Pilot-Quantum is presented as a Quantum-HPC middleware framework designed to address the challenges of integrating quantum and classical computing resources. It focuses on managing heterogeneous resources, including diverse Quantum Processing Unit (QPU) modalities and various integration types with classical resources, such as accelerators.
+Pilot-Quantum is a Quantum-HPC middleware framework designed to address the challenges of integrating quantum and classical computing resources. It focuses on managing heterogeneous resources, including diverse Quantum Processing Unit (QPU) modalities and various integration types with classical resources, such as accelerators.
+
  
 Requirements:
 
@@ -69,9 +70,64 @@ pcs.wait_tasks(tasks)
 
 # Terminate the pilot
 pcs.cancel()
-
 ```
 
+## QDREAMER Integration
+
+Pilot-Quantum now includes QDREAMER (Quantum Resource Allocation and Management Engine) for optimal resource selection:
+
+## Key Features
+
+- **Multi-Executor Support**: Qiskit, IBMQ, PennyLane, and AWS Braket executors
+- **Optimized Resource Selection**: QDREAMER integration for optimal quantum backend selection
+- **Distributed Computing**: Ray and Dask support for scalable quantum computing
+- **Multi-Pilot Architecture**: Manage multiple quantum resources simultaneously
+- **Real-time Optimization**: PuLP-based resource optimization with queue monitoring
+- **Circuit Compatibility**: Automatic gate set and qubit count validation
+
+```python
+from pilot.pilot_compute_service import ExecutionEngine, PilotComputeService
+from pilot.dreamer import QuantumTask
+
+# Create quantum task
+qt = QuantumTask(
+    circuit=my_quantum_circuit,
+    num_qubits=2,
+    gate_set=["h", "cx"],
+    resource_config={"num_qpus": 1}
+)
+
+# Initialize QDREAMER
+pcs.initialize_dreamer({"optimization_mode": "high_fidelity"})
+
+# Submit task with intelligent resource selection
+task_id = pcs.submit_quantum_task(qt)
+result = pcs.get_results([task_id])
+```
+
+### QDREAMER Examples
+
+See `examples/dreamer/` for comprehensive examples:
+- Multi-pilot resource management
+- Custom backend configuration
+- PennyLane integration
+- Framework-provided backends
+- Intelligent load balancing
+
+## Architecture
+
+### Components
+- **Pilot Compute Service**: Core orchestration and pilot management
+- **QDREAMER**: Optimal quantum resource selection engine based on fidelity and resource availability
+- **Quantum Executors**: Backend-specific execution engines
+- **Resource Generator utility**: Quantum resource discovery and management
+- **Worker Processes**: Distributed task execution
+
+### Supported Executors
+- **QiskitExecutor**: Local Qiskit Aer simulators
+- **IBMQExecutor**: IBM Quantum Runtime service
+- **PennyLaneExecutor**: PennyLane quantum circuits
+- **BraketExecutor**: AWS Braket quantum service
 
 ## Hints
 
