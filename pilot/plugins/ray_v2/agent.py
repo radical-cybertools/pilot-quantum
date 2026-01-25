@@ -44,10 +44,30 @@ class RayPilotAgent(PilotAgent):
         scheduler_address = self.get_scheduler_address()
         
         # Start Ray on the node
-        command = f"export RAY_ENABLE_WINDOWS_OR_OSX_CLUSTER=1; " \
+        # Include CUDA_VISIBLE_DEVICES if set, to ensure Ray workers see the correct GPUs
+        cuda_env = ""
+        cuda_visible_devices = worker_config.get("cuda_visible_devices") or os.environ.get("CUDA_VISIBLE_DEVICES")
+        if cuda_visible_devices:
+            cuda_env = f"export CUDA_VISIBLE_DEVICES={cuda_visible_devices}; "
+            # Prevent Ray from overriding CUDA_VISIBLE_DEVICES when num_gpus=0
+            cuda_env += "export RAY_EXPERIMENTAL_NOSET_CUDA_VISIBLE_DEVICES=1; "
+        # Allow explicit resource override to avoid incorrect GPU counts
+        override_env = ""
+        ray_override_resources = worker_config.get("ray_override_resources") or os.environ.get("RAY_OVERRIDE_RESOURCES")
+        if ray_override_resources:
+            override_env = f"export RAY_OVERRIDE_RESOURCES='{ray_override_resources}'; "
+        
+        command = f"{cuda_env}{override_env}export RAY_ENABLE_WINDOWS_OR_OSX_CLUSTER=1; " \
                 f"ray start --address {scheduler_address} " \
                 f"--num-cpus={worker_config['cores_per_node']} " \
-                f"--num-gpus={worker_config['gpus_per_node']}"                  
+                f"--num-gpus={worker_config['gpus_per_node']}"
+        
+        # Log the full command for debugging
+        self.logger.info(f"[RAY_WORKER_START] Starting Ray worker on {node}")
+        self.logger.info(f"[RAY_WORKER_START] CUDA_VISIBLE_DEVICES={cuda_visible_devices}")
+        self.logger.info(f"[RAY_WORKER_START] RAY_OVERRIDE_RESOURCES={ray_override_resources}")
+        self.logger.info(f"[RAY_WORKER_START] num_gpus={worker_config['gpus_per_node']}")
+        self.logger.info(f"[RAY_WORKER_START] Command: {command}")
             
         host_node_ip_address = get_localhost()
         if scheduler_address.startswith(host_node_ip_address):

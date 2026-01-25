@@ -59,6 +59,7 @@ class RayManager(PilotManager):
             
         
         # Wait and read the log file to get the scheduler address
+        scheduler_address = None
         for i in range(10):
             ray_client = ray.init(_node_ip_address=host_node_ip_address)
             try:
@@ -107,6 +108,12 @@ class RayManager(PilotManager):
             'cores_per_node': str(self.pilot_compute_description.get("cores_per_node", "1")),
             'gpus_per_node': str(self.pilot_compute_description.get("gpus_per_node", "1")),
         }
+        cuda_visible_devices = self.pilot_compute_description.get("cuda_visible_devices")
+        if cuda_visible_devices:
+            worker_config["cuda_visible_devices"] = str(cuda_visible_devices)
+        ray_override_resources = self.pilot_compute_description.get("ray_override_resources")
+        if ray_override_resources:
+            worker_config["ray_override_resources"] = str(ray_override_resources)
         with open(self.worker_config_file, 'w') as f:
             json.dump(worker_config, f)
             

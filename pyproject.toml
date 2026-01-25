@@ -1,0 +1,43 @@
+[project]
+name = "pilot-quantum"
+version = "0.31.23"
+requires-python = ">=3.12"
+
+[tool.poetry]
+name = "pilot-quantum"
+version = "0.31.23"
+description = "Framework for Management of Quantum-HPC applications on HPC clusters managed by SLURM"
+authors = ["Andre Luckow <aluckow@clemson.edu>", "Pradeep Mantha"]
+readme = "README.md"
+license = "Apache-2.0"
+homepage = "https://github.com/radical-cybertools/pilot-quantum"
+repository = "https://github.com/radical-cybertools/pilot-quantum"
+keywords = ["quantum", "HPC", "pilot", "dask", "ray", "SLURM"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Programming Language :: Python",
+    "Environment :: Console",
+    "Topic :: Utilities",
+]
+packages = [
+    { include = "pilot" }
+]
+include = ["VERSION", "*.xml", "*.yaml", "*.properties"]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+python-hostlist = "1.23.0"
+"dask[complete]" = "^2024.12.0"
+distributed = "^2024.12.0"
+ray = {version = "^2.53.0", extras = ["all"]}
+asyncssh = "^2.22.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.0"
+
+[tool.poetry.extras]
+examples = ["pennylane"]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

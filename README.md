@@ -1,6 +1,6 @@
 # Pilot-Quantum
 
-Last Updated: 10/09/2024
+Last Updated: 01/24/2026
 
 # Overview:
 
@@ -9,32 +9,70 @@ Pilot-Quantum is presented as a Quantum-HPC middleware framework designed to add
 Requirements:
 
 	* Currently only SLURM clusters are supported
-	* Setup password-less documentation, e.g., using sshproxy on Perlmutter.
-
-Anaconda or Miniconda is the preferred distribution
-
+	* Setup password-less SSH, e.g., using sshproxy on Perlmutter.
 
 ## Installation
 
-Create environment with tool of your choice:
+### Using uv (Recommended)
 
-    conda create -n pilot-quantum python=3.12
+Create a virtual environment and install dependencies:
 
-Requirement (in case a manual installation is required):
+```bash
+# Install uv if not already installed
+# Create virtual environment
+uv venv .venv
 
-The best way to utilize Pilot-Quantum is Anaconda, which provides an easy way to install
+# Activate the environment
+source .venv/bin/activate  # On Linux/Mac
+# or
+.venv\Scripts\activate  # On Windows
 
-    pip install -r requirements.txt
+# Install pilot-quantum in editable mode
+uv pip install -e .
+```
 
-To install Pilot-Quantum type:
+### Using standard venv and pip
 
-    python setup.py install
+```bash
+# Create virtual environment
+python3 -m venv .venv
+
+# Activate the environment
+source .venv/bin/activate  # On Linux/Mac
+
+# Install pilot-quantum in editable mode
+pip install -e .
+```
+
+### Development Installation
+
+For development with additional testing dependencies:
+
+```bash
+# With uv
+uv pip install -e ".[dev]"
+
+# With pip
+pip install -e ".[dev]"
+```
+
+### Optional: PennyLane Examples
+
+To run the PennyLane examples:
+
+```bash
+# With uv
+uv pip install -e ".[examples]"
+
+# With pip
+pip install -e ".[examples]"
+```
 
 ## API Usage
 
 Here is a simple script that launches Pythonic functions as tasks on remote SLURM nodes using Pilot-Quantum framework.
 
-```
+```python
 
 from pilot.pilot_compute_service import ExecutionEngine, PilotComputeService
 
@@ -75,4 +113,4 @@ pcs.cancel()
 
 ## Hints
 
-Your default conda environment should contain all Pilot-Quantum and application dependencies. Activate it, e.g., in the `.bashrc`
+Your default Python environment (activated in `.bashrc` or shell profile) should contain all Pilot-Quantum and application dependencies for remote execution on compute nodes.
