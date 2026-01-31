@@ -27,8 +27,8 @@ include = ["VERSION", "*.xml", "*.yaml", "*.properties"]
 [tool.poetry.dependencies]
 python = "^3.12"
 python-hostlist = "1.23.0"
-"dask[complete]" = "^2024.12.0"
-distributed = "^2024.12.0"
+"dask[complete]" = "^2025.12.0"
+distributed = "^2025.12.0"
 ray = {version = "^2.53.0", extras = ["all"]}
 asyncssh = "^2.22.0"
 
