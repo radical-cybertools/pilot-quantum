@@ -114,3 +114,20 @@ pcs.cancel()
 ## Hints
 
 Your default Python environment (activated in `.bashrc` or shell profile) should contain all Pilot-Quantum and application dependencies for remote execution on compute nodes.
+
+
+## Citation
+
+If you use this work, please cite:
+
+```bibtex
+@inproceedings{mantha2025pilotquantum,
+  author    = {Mantha, Pradeep and Kiwit, Florian J. and Saurabh, Nishant and Jha, Shantenu and Luckow, Andre},
+  title     = {Pilot-Quantum: A Middleware for Quantum-HPC Resource, Workload and Task Management},
+  booktitle = {2025 IEEE 25th International Symposium on Cluster, Cloud and Internet Computing (CCGrid)},
+  year      = {2025},
+  pages     = {1--10},
+  doi       = {10.1109/CCGRID64434.2025.00070},
+  url       = {https://doi.ieeecomputersociety.org/10.1109/CCGRID64434.2025.00070}
+}
+```

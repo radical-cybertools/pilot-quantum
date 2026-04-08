@@ -1,5 +1,6 @@
 cff-version: 1.2.0
-message: "If you use this software, please cite it as below."
+message: "If you use this software, please work it as below."
+title: "Pilot-Quantum: A Middleware for Quantum-HPC Resource, Workload and Task Management"
 authors:
 - family-names: "Mantha"
   given-names: "Pradeep"
@@ -10,14 +11,31 @@ authors:
 - family-names: "Saurabh"
   given-names: "Nishant"
   orcid: "https://orcid.org/0000-0002-1926-4693"
-- family-names: "Shantenu"
-  given-names: "Jha"
+- family-names: "Jha"
+  given-names: "Shantenu"
   orcid: "https://orcid.org/0000-0002-5040-026X"
-- family-names: "Mantha"
-  given-names: "Pradeep"
+- family-names: "Luckow"
+  given-names: "Andre"
   orcid: "https://orcid.org/0000-0002-1225-4062"
-title: "Pilot-Quantum"
-version: 0.1.0
-doi: 
-date-released: 2024-10-10
-url: "https://github.com/radical-cybertools/pilot-quantum"
+doi: "10.1109/CCGRID64434.2025.00070"
+date-released: 2025-05-19
+url: "https://doi.ieeecomputersociety.org/10.1109/CCGRID64434.2025.00070"
+preferred-citation:
+  type: paper-conference
+  title: "Pilot-Quantum: A Middleware for Quantum-HPC Resource, Workload and Task Management"
+  authors:
+    - family-names: "Mantha"
+      given-names: "Pradeep"
+    - family-names: "Kiwit"
+      given-names: "Florian J."
+    - family-names: "Saurabh"
+      given-names: "Nishant"
+    - family-names: "Jha"
+      given-names: "Shantenu"
+    - family-names: "Luckow"
+      given-names: "Andre"
+  year: 2025
+  booktitle: "2025 IEEE 25th International Symposium on Cluster, Cloud and Internet Computing (CCGrid)"
+  start: 1
+  end: 10
+  doi: "10.1109/CCGRID64434.2025.00070"
